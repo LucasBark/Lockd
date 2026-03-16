@@ -78,26 +78,34 @@ function StudentEditorRoute() {
   const studentName = useMemo(() => searchParams.get('name') ?? '', [searchParams]);
   const [teacherPeerId, setTeacherPeerId] = useState<string>('');
 
+  // Poll for teacher_peer_id until set (teacher may open dashboard after student)
   useEffect(() => {
     if (!sessionId) return;
     let mounted = true;
 
-    supabase
-      .from('sessions')
-      .select('teacher_peer_id')
-      .eq('id', sessionId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!mounted) return;
-        if (error) {
-          console.error('Error fetching teacher peer ID:', error);
-          return;
-        }
-        setTeacherPeerId(data?.teacher_peer_id ?? '');
-      });
+    const fetchTeacherPeerId = () => {
+      supabase
+        .from('sessions')
+        .select('teacher_peer_id')
+        .eq('id', sessionId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!mounted) return;
+          if (error) {
+            console.error('Error fetching teacher peer ID:', error);
+            return;
+          }
+          const id = (data?.teacher_peer_id ?? '').toString().trim();
+          if (id) setTeacherPeerId(id);
+        });
+    };
+
+    fetchTeacherPeerId();
+    const interval = setInterval(fetchTeacherPeerId, 2500);
 
     return () => {
       mounted = false;
+      clearInterval(interval);
     };
   }, [sessionId]);
 

@@ -40,12 +40,11 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   });
 
   const { isLoading: aiLoading, loadingProgress, analyzeContent, isReady } = useWebLLM();
-  const activeStudentIds = useMemo(() => {
-    const now = Date.now();
-    return Array.from(students.values())
-      .filter((s) => now - s.lastSeen <= 10_000)
-      .map((s) => s.studentId);
-  }, [students]);
+  // Include all students with documents so AI runs without depending on P2P heartbeats
+  const activeStudentIds = useMemo(
+    () => Array.from(students.keys()),
+    [students]
+  );
 
   const { qualities } = useAIVector({
     sessionId,
