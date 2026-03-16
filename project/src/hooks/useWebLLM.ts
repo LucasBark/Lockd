@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { CreateMLCEngine, MLCEngineInterface } from '@mlc-ai/web-llm';
+import { CreateMLCEngine, MLCEngineInterface, prebuiltAppConfig } from '@mlc-ai/web-llm';
 
 export type ContentQuality = 'Productive' | 'Gibberish' | 'Analyzing' | 'Unknown';
 
@@ -15,6 +15,7 @@ export function useWebLLM() {
     const initEngine = async () => {
       try {
         const mlcEngine = await CreateMLCEngine('Llama-3.1-8B-Instruct-q4f16_1-MLC-1k', {
+          appConfig: { ...prebuiltAppConfig, useIndexedDBCache: true },
           initProgressCallback: (progress) => {
             if (mounted) {
               setLoadingProgress(Math.round(progress.progress * 100));

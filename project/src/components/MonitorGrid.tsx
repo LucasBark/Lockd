@@ -65,6 +65,20 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     }
   }, [peerId, sessionId]);
 
+  // Persist session so teacher can rejoin after closing tab or navigating back
+  useEffect(() => {
+    if (sessionId && sessionCode) {
+      try {
+        localStorage.setItem(
+          'lockd_teacher_session',
+          JSON.stringify({ sessionId, sessionCode })
+        );
+      } catch {
+        // ignore quota or privacy errors
+      }
+    }
+  }, [sessionId, sessionCode]);
+
   useEffect(() => {
     if (!qualities || qualities.size === 0) return;
     setStudents((prev) => {
