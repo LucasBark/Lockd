@@ -1,0 +1,9 @@
+{
+  "name": "Lockd - Classroom Monitoring",
+  "short_name": "Lockd",
+  "description": "Real-time classroom monitoring with AI-powered analysis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb"
+}
