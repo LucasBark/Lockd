@@ -1,15 +1,45 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { LogIn, Loader } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+
+type UserRole = 'teacher' | 'student';
+const TEACHER_PASSWORD = 'TeacherCode26';
 
 export function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [role, setRole] = useState<UserRole>('student');
+  const [fullName, setFullName] = useState('');
+  const [teacherCode, setTeacherCode] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
+
+  const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
+
+  useEffect(() => {
+    const mode = params.get('mode');
+    if (mode === 'signup') setIsSignUp(true);
+    if (mode === 'signin') setIsSignUp(false);
+
+    const roleParam = params.get('role');
+    if (roleParam === 'teacher' || roleParam === 'student') setRole(roleParam);
+  }, [params]);
+
+  const routeByRole = async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    const meta = (data.user?.user_metadata ?? {}) as { role?: UserRole };
+    const next = params.get('next');
+    if (next) {
+      navigate(next, { replace: true });
+      return;
+    }
+    if (meta.role === 'teacher') navigate('/teacher/create', { replace: true });
+    else navigate('/student/join', { replace: true });
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,9 +47,23 @@ export function Auth() {
 
     try {
       if (isSignUp) {
+        if (!fullName.trim()) {
+          alert('Please enter your name.');
+          return;
+        }
+        if (role === 'teacher' && teacherCode !== TEACHER_PASSWORD) {
+          alert('Invalid teacher verification code.');
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              role,
+              full_name: fullName.trim(),
+            },
+          },
         });
 
         if (error) throw error;
@@ -33,10 +77,7 @@ export function Auth() {
         });
 
         if (error) throw error;
-
-        const params = new URLSearchParams(location.search);
-        const next = params.get('next') || '/';
-        navigate(next, { replace: true });
+        await routeByRole();
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -65,6 +106,70 @@ export function Auth() {
         </div>
 
         <form onSubmit={handleAuth}>
+          {isSignUp && (
+            <>
+              <div className="mb-4">
+                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g., Alex Johnson"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <div className="block text-sm font-medium text-gray-700 mb-2">Account type</div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRole('student')}
+                    className={`flex-1 px-4 py-3 rounded-lg border text-sm font-medium ${
+                      role === 'student'
+                        ? 'border-green-500 bg-green-50 text-green-800'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Student
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('teacher')}
+                    className={`flex-1 px-4 py-3 rounded-lg border text-sm font-medium ${
+                      role === 'teacher'
+                        ? 'border-blue-500 bg-blue-50 text-blue-800'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Teacher
+                  </button>
+                </div>
+              </div>
+
+              {role === 'teacher' && (
+                <div className="mb-4">
+                  <label htmlFor="teacherCode" className="block text-sm font-medium text-gray-700 mb-2">
+                    Teacher verification code
+                  </label>
+                  <input
+                    type="password"
+                    id="teacherCode"
+                    value={teacherCode}
+                    onChange={(e) => setTeacherCode(e.target.value)}
+                    placeholder="Enter teacher code"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              )}
+            </>
+          )}
+
           <div className="mb-4">
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
               Email

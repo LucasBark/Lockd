@@ -22,8 +22,10 @@ export function TeacherDocModal({
   onClose: () => void;
 }) {
   const [isLoading, setIsLoading] = useState(true);
-  const [content, setContent] = useState('');
+  const [contentHtml, setContentHtml] = useState('');
+  const [contentText, setContentText] = useState('');
   const [pasteCount, setPasteCount] = useState(0);
+  const [stagnantCount, setStagnantCount] = useState(0);
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
 
   const [selectedText, setSelectedText] = useState('');
@@ -36,16 +38,16 @@ export function TeacherDocModal({
   const context = useMemo(() => {
     if (selectionStart == null || selectionEnd == null) return '';
     const start = Math.max(0, selectionStart - 60);
-    const end = Math.min(content.length, selectionEnd + 60);
-    return content.slice(start, end);
-  }, [content, selectionStart, selectionEnd]);
+    const end = Math.min(contentText.length, selectionEnd + 60);
+    return contentText.slice(start, end);
+  }, [contentText, selectionStart, selectionEnd]);
 
   useEffect(() => {
     let mounted = true;
     setIsLoading(true);
 
     Promise.all([
-      supabase.from('documents').select('content,paste_count').eq('id', documentId).maybeSingle(),
+      supabase.from('documents').select('content,content_text,paste_count,stagnant_count').eq('id', documentId).maybeSingle(),
       supabase
         .from('document_suggestions')
         .select('*')
@@ -58,8 +60,10 @@ export function TeacherDocModal({
         if (sugRes.error) console.error('Error loading suggestions:', sugRes.error);
 
         if (docRes.data) {
-          setContent(docRes.data.content ?? '');
+          setContentHtml(docRes.data.content ?? '');
+          setContentText(docRes.data.content_text ?? '');
           setPasteCount(typeof docRes.data.paste_count === 'number' ? docRes.data.paste_count : 0);
+          setStagnantCount(typeof docRes.data.stagnant_count === 'number' ? docRes.data.stagnant_count : 0);
         }
         if (sugRes.data) setSuggestions(sugRes.data as SuggestionRow[]);
       })
@@ -73,9 +77,11 @@ export function TeacherDocModal({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'documents', filter: `id=eq.${documentId}` },
         (payload) => {
-          const next = payload.new as { content?: string; paste_count?: number };
-          if (typeof next.content === 'string') setContent(next.content);
+          const next = payload.new as { content?: string; content_text?: string; paste_count?: number; stagnant_count?: number };
+          if (typeof next.content === 'string') setContentHtml(next.content);
+          if (typeof next.content_text === 'string') setContentText(next.content_text);
           if (typeof next.paste_count === 'number') setPasteCount(next.paste_count);
+          if (typeof next.stagnant_count === 'number') setStagnantCount(next.stagnant_count);
         }
       )
       .subscribe();
@@ -169,6 +175,8 @@ export function TeacherDocModal({
             <div className="text-lg font-semibold text-gray-900">Student doc: {studentName}</div>
             <div className="text-sm text-gray-600">
               Pastes: <span className="font-mono font-semibold">{pasteCount}</span>
+              <span className="mx-2 text-gray-300">•</span>
+              Stagnant: <span className="font-mono font-semibold">{stagnantCount}</span>
             </div>
           </div>
           <button
@@ -185,12 +193,19 @@ export function TeacherDocModal({
           <div className="p-5 border-b lg:border-b-0 lg:border-r">
             <div className="text-sm font-medium text-gray-700 mb-2">Preview (select text to anchor a suggestion)</div>
             <textarea
-              value={content}
+              value={contentText}
               readOnly
               onMouseUp={captureSelection}
               onKeyUp={captureSelection}
               className="w-full h-[420px] p-4 border border-gray-300 rounded-lg bg-gray-50 font-sans text-sm whitespace-pre-wrap"
             />
+            <div className="mt-3">
+              <div className="text-xs font-medium text-gray-600 mb-1">Rendered preview</div>
+              <div
+                className="max-h-40 overflow-auto border border-gray-200 rounded-lg bg-white p-3 text-sm"
+                dangerouslySetInnerHTML={{ __html: contentHtml || '' }}
+              />
+            </div>
             <div className="mt-3 text-xs text-gray-600">
               Selected: <span className="font-medium">{selectedText ? `"${selectedText.slice(0, 80)}${selectedText.length > 80 ? '…' : ''}"` : '—'}</span>
             </div>

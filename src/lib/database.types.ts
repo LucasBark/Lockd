@@ -38,7 +38,9 @@ export interface Database {
           student_name: string;
           student_peer_id: string | null;
           content: string;
+          content_text: string;
           paste_count: number;
+          stagnant_count: number;
           last_activity: string;
           created_at: string;
           updated_at: string;
@@ -50,7 +52,9 @@ export interface Database {
           student_name: string;
           student_peer_id?: string | null;
           content?: string;
+          content_text?: string;
           paste_count?: number;
+          stagnant_count?: number;
           last_activity?: string;
           created_at?: string;
           updated_at?: string;
@@ -62,7 +66,9 @@ export interface Database {
           student_name?: string;
           student_peer_id?: string | null;
           content?: string;
+          content_text?: string;
           paste_count?: number;
+          stagnant_count?: number;
           last_activity?: string;
           created_at?: string;
           updated_at?: string;

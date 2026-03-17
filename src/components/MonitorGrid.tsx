@@ -12,6 +12,7 @@ interface StudentStatus extends StudentHeartbeat {
   quality: ContentQuality;
   lastSeen: number;
   pasteCount: number;
+  stagnantCount: number;
 }
 
 interface MonitorGridProps {
@@ -22,6 +23,7 @@ interface MonitorGridProps {
 export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [students, setStudents] = useState<Map<string, StudentStatus>>(new Map());
   const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
+  const [sessionTitle, setSessionTitle] = useState<string>('');
   const handleHeartbeat = useCallback((data: StudentHeartbeat) => {
     setStudents((prev) => {
       const newMap = new Map(prev);
@@ -33,6 +35,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         quality: existing?.quality || 'Unknown',
         lastSeen: Date.now(),
         pasteCount: existing?.pasteCount ?? 0,
+        stagnantCount: existing?.stagnantCount ?? 0,
       });
       return newMap;
     });
@@ -68,6 +71,26 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         });
     }
   }, [peerId, sessionId]);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase
+      .from('sessions')
+      .select('title')
+      .eq('id', sessionId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          console.error('Error fetching session title:', error);
+          return;
+        }
+        if (data?.title) setSessionTitle(data.title);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId]);
 
   // Persist session so teacher can rejoin after closing tab or navigating back
   useEffect(() => {
@@ -120,10 +143,11 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
               isTabActive: existing?.isTabActive ?? true,
               isWindowFocused: existing?.isWindowFocused ?? true,
               lastInput: existing?.lastInput ?? Date.now(),
-              snippet: doc.content.substring(0, 200),
+              snippet: (doc.content_text ?? doc.content ?? '').substring(0, 200),
               quality: existing?.quality || 'Unknown',
               lastSeen: existing?.lastSeen || Date.now(),
               pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
+              stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
             });
           });
           return newMap;
@@ -157,10 +181,11 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 isTabActive: existing?.isTabActive ?? true,
                 isWindowFocused: existing?.isWindowFocused ?? true,
                 lastInput: existing?.lastInput ?? Date.now(),
-                snippet: doc.content.substring(0, 200),
+                snippet: (doc.content_text ?? doc.content ?? '').substring(0, 200),
                 quality: existing?.quality || 'Unknown',
                 lastSeen: existing?.lastSeen || Date.now(),
                 pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
+                stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
               });
               return newMap;
             });
@@ -211,7 +236,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
             <div className="flex items-center gap-3">
               <Monitor className="w-8 h-8 text-blue-600" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">Lockd Dashboard</h1>
+                <h1 className="text-3xl font-bold text-gray-800">{sessionTitle || 'Class'}</h1>
                 <p className="text-gray-600">Session Code: <span className="font-mono font-bold text-blue-600">{sessionCode}</span></p>
               </div>
             </div>
@@ -277,8 +302,13 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                     </p>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="text-xs text-gray-600">
-                      Pastes: <span className="font-mono font-semibold">{student.pasteCount}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="text-xs text-gray-600">
+                        Pastes: <span className="font-mono font-semibold">{student.pasteCount}</span>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Stagnant: <span className="font-mono font-semibold">{student.stagnantCount}</span>
+                      </div>
                     </div>
                     <button
                       type="button"

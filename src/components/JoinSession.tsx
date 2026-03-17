@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -12,6 +12,19 @@ export function JoinSession({ userId }: JoinSessionProps) {
   const [name, setName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) return;
+      const meta = (data.user?.user_metadata ?? {}) as { full_name?: string };
+      if (meta.full_name && !name) setName(meta.full_name);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [name]);
 
   const handleJoinSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +57,7 @@ export function JoinSession({ userId }: JoinSessionProps) {
 
       if (existingDoc) {
         navigate(
-          `/student/session/${sessionData.id}/doc/${existingDoc.id}?name=${encodeURIComponent(existingDoc.student_name)}`,
+          `/student/session/${sessionData.id}/doc/${existingDoc.id}`,
           { replace: true }
         );
         return;
@@ -65,7 +78,7 @@ export function JoinSession({ userId }: JoinSessionProps) {
 
       if (documentData) {
         navigate(
-          `/student/session/${sessionData.id}/doc/${documentData.id}?name=${encodeURIComponent(name.trim())}`,
+          `/student/session/${sessionData.id}/doc/${documentData.id}`,
           { replace: true }
         );
       }
