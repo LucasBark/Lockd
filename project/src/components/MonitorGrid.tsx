@@ -12,6 +12,7 @@ interface StudentStatus extends StudentHeartbeat {
   quality: ContentQuality;
   lastSeen: number;
   pasteCount: number;
+  stagnantCount: number;
 }
 
 interface MonitorGridProps {
@@ -33,6 +34,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         quality: existing?.quality || 'Unknown',
         lastSeen: Date.now(),
         pasteCount: existing?.pasteCount ?? 0,
+        stagnantCount: existing?.stagnantCount ?? 0,
       });
       return newMap;
     });
@@ -120,10 +122,11 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
               isTabActive: existing?.isTabActive ?? true,
               isWindowFocused: existing?.isWindowFocused ?? true,
               lastInput: existing?.lastInput ?? Date.now(),
-              snippet: doc.content.substring(0, 200),
+              snippet: (doc.content_text ?? doc.content ?? '').substring(0, 200),
               quality: existing?.quality || 'Unknown',
               lastSeen: existing?.lastSeen || Date.now(),
               pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
+              stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
             });
           });
           return newMap;
@@ -157,10 +160,11 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 isTabActive: existing?.isTabActive ?? true,
                 isWindowFocused: existing?.isWindowFocused ?? true,
                 lastInput: existing?.lastInput ?? Date.now(),
-                snippet: doc.content.substring(0, 200),
+                snippet: (doc.content_text ?? doc.content ?? '').substring(0, 200),
                 quality: existing?.quality || 'Unknown',
                 lastSeen: existing?.lastSeen || Date.now(),
                 pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
+                stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
               });
               return newMap;
             });
@@ -277,8 +281,13 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                     </p>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="text-xs text-gray-600">
-                      Pastes: <span className="font-mono font-semibold">{student.pasteCount}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="text-xs text-gray-600">
+                        Pastes: <span className="font-mono font-semibold">{student.pasteCount}</span>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Stagnant: <span className="font-mono font-semibold">{student.stagnantCount}</span>
+                      </div>
                     </div>
                     <button
                       type="button"
