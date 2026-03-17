@@ -4,12 +4,14 @@ import { supabase } from '../lib/supabase';
 import { usePeerConnection, StudentHeartbeat } from '../hooks/usePeerConnection';
 import { useWebLLM, ContentQuality } from '../hooks/useWebLLM';
 import { useAIVector } from '../hooks/useAIVector';
+import { TeacherDocModal } from './TeacherDocModal';
 
 interface StudentStatus extends StudentHeartbeat {
   documentId: string;
   content: string;
   quality: ContentQuality;
   lastSeen: number;
+  pasteCount: number;
 }
 
 interface MonitorGridProps {
@@ -19,6 +21,7 @@ interface MonitorGridProps {
 
 export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [students, setStudents] = useState<Map<string, StudentStatus>>(new Map());
+  const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
   const handleHeartbeat = useCallback((data: StudentHeartbeat) => {
     setStudents((prev) => {
       const newMap = new Map(prev);
@@ -29,6 +32,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         content: existing?.content || data.snippet,
         quality: existing?.quality || 'Unknown',
         lastSeen: Date.now(),
+        pasteCount: existing?.pasteCount ?? 0,
       });
       return newMap;
     });
@@ -119,6 +123,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
               snippet: doc.content.substring(0, 200),
               quality: existing?.quality || 'Unknown',
               lastSeen: existing?.lastSeen || Date.now(),
+              pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
             });
           });
           return newMap;
@@ -155,6 +160,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 snippet: doc.content.substring(0, 200),
                 quality: existing?.quality || 'Unknown',
                 lastSeen: existing?.lastSeen || Date.now(),
+                pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
               });
               return newMap;
             });
@@ -270,6 +276,19 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                       {student.snippet || 'No content yet...'}
                     </p>
                   </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="text-xs text-gray-600">
+                      Pastes: <span className="font-mono font-semibold">{student.pasteCount}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOpenDoc({ documentId: student.documentId, studentName: student.studentName })}
+                      disabled={!student.documentId}
+                      className="text-xs px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Open doc
+                    </button>
+                  </div>
                   <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
                     <Activity className="w-3 h-3" />
                     <span>
@@ -281,6 +300,14 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
             );
           })}
         </div>
+
+        {openDoc && (
+          <TeacherDocModal
+            documentId={openDoc.documentId}
+            studentName={openDoc.studentName}
+            onClose={() => setOpenDoc(null)}
+          />
+        )}
 
         {students.size === 0 && (
           <div className="text-center py-12">
