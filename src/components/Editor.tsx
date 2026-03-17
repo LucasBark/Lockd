@@ -13,6 +13,7 @@ interface EditorProps {
 
 export function Editor({ sessionId, studentId, studentName, teacherPeerId, documentId }: EditorProps) {
   const [content, setContent] = useState('');
+  const [pasteCount, setPasteCount] = useState(0);
   const [lastInput, setLastInput] = useState(Date.now());
   const [isTabActive, setIsTabActive] = useState(true);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
@@ -34,6 +35,31 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
         });
     }
   }, [peerId, documentId]);
+
+  // Load initial content + paste count (so refresh doesn't wipe the editor).
+  useEffect(() => {
+    let mounted = true;
+    supabase
+      .from('documents')
+      .select('content,paste_count')
+      .eq('id', documentId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          console.error('Error loading document:', error);
+          return;
+        }
+        if (data) {
+          setContent(data.content ?? '');
+          setPasteCount(typeof data.paste_count === 'number' ? data.paste_count : 0);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [documentId, sessionId]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -99,6 +125,25 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     }, 1000);
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // Keep default paste behavior; just count it.
+    const next = pasteCount + 1;
+    setPasteCount(next);
+    setLastInput(Date.now());
+
+    supabase
+      .from('documents')
+      .update({
+        paste_count: next,
+        last_activity: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', documentId)
+      .then(({ error }) => {
+        if (error) console.error('Error updating paste count:', error);
+      });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
       <div className="max-w-4xl mx-auto">
@@ -127,11 +172,15 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
             }`}>
               {isWindowFocused ? 'Window Focused' : 'Window Blurred'}
             </div>
+            <div className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700">
+              Pastes: {pasteCount}
+            </div>
           </div>
 
           <textarea
             value={content}
             onChange={handleContentChange}
+            onPaste={handlePaste}
             placeholder="Start writing your work here..."
             className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
           />
