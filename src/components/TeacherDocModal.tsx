@@ -210,50 +210,6 @@ export function TeacherDocModal({
     }
   };
 
-  const [isImportingDocx, setIsImportingDocx] = useState(false);
-
-  const importDocxTemplate = async (file: File) => {
-    setIsImportingDocx(true);
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      // Lazy-load so student routes aren't affected if DOCX features aren't used.
-      const mammothModule: any = await import('mammoth');
-      const converter = mammothModule?.convertToHtml ?? mammothModule?.default?.convertToHtml;
-      if (!converter) throw new Error('mammoth.convertToHtml not available');
-      const result = await converter({ arrayBuffer });
-      const html = result.value ?? '';
-      const tmp = document.createElement('div');
-      tmp.innerHTML = html;
-      const plain = tmp.innerText ?? '';
-
-      const shouldApplyToContent = !contentText.trim();
-      const updatePayload: Record<string, unknown> = {
-        assignment_template_html: html,
-        assignment_template_text: plain,
-      };
-      if (shouldApplyToContent) {
-        updatePayload.content = html;
-        updatePayload.content_text = plain;
-        updatePayload.last_activity = new Date().toISOString();
-        updatePayload.updated_at = new Date().toISOString();
-      }
-
-      const { error } = await supabase.from('documents').update(updatePayload).eq('id', documentId);
-      if (error) throw error;
-      if (shouldApplyToContent) {
-        setContentHtml(html);
-        setContentText(plain);
-      }
-
-      alert(shouldApplyToContent ? 'Template imported and inserted into the student doc.' : 'Template imported (student doc not overwritten).');
-    } catch (err) {
-      console.error('Docx import error:', err);
-      alert('Failed to import DOCX template.');
-    } finally {
-      setIsImportingDocx(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden">
@@ -330,23 +286,8 @@ export function TeacherDocModal({
 
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">
-                  Import DOCX template (applies to students if their doc is empty)
+                  Template import is handled in the dashboard before students join.
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    accept=".docx"
-                    className="text-sm"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) importDocxTemplate(f);
-                    }}
-                    disabled={isImportingDocx}
-                  />
-                  <div className="text-xs text-gray-500">
-                    {isImportingDocx ? 'Importing…' : 'Choose .docx file'}
-                  </div>
-                </div>
               </div>
             </div>
 

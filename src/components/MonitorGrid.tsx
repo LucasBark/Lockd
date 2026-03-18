@@ -21,6 +21,8 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>('');
   const [sessionIsActive, setSessionIsActive] = useState<boolean>(true);
+  const [sessionHasTemplate, setSessionHasTemplate] = useState<boolean>(false);
+  const [isSettingTemplate, setIsSettingTemplate] = useState(false);
   const handleHeartbeat = useCallback((data: StudentHeartbeat) => {
     setStudents((prev) => {
       const newMap = new Map(prev);
@@ -57,7 +59,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     let mounted = true;
     supabase
       .from('sessions')
-      .select('title,is_active')
+      .select('title,is_active,assignment_template_text')
       .eq('id', sessionId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -68,11 +70,64 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         }
         if (data?.title) setSessionTitle(data.title);
         if (typeof data?.is_active === 'boolean') setSessionIsActive(data.is_active);
+        if (typeof data?.assignment_template_text === 'string') {
+          setSessionHasTemplate(data.assignment_template_text.trim().length > 0);
+        }
       });
     return () => {
       mounted = false;
     };
   }, [sessionId]);
+
+  const handleSetTemplate = async (file: File) => {
+    setIsSettingTemplate(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+
+      const mammothModule: any = await import('mammoth');
+      const converter = mammothModule?.convertToHtml ?? mammothModule?.default?.convertToHtml;
+      if (!converter) throw new Error('mammoth.convertToHtml not available');
+
+      const result = await converter({ arrayBuffer });
+      const html = result.value ?? '';
+
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const plain = tmp.innerText ?? '';
+
+      const { error } = await supabase
+        .from('sessions')
+        .update({
+          assignment_template_html: html,
+          assignment_template_text: plain,
+        })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      setSessionHasTemplate(plain.trim().length > 0);
+
+      // Apply to any existing student docs that are still empty.
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('documents')
+        .update({
+          assignment_template_html: html,
+          assignment_template_text: plain,
+          content: html,
+          content_text: plain,
+          last_activity: nowIso,
+          updated_at: nowIso,
+        })
+        .eq('session_id', sessionId)
+        .eq('content_text', '');
+    } catch (err) {
+      console.error('Error setting DOCX template:', err);
+      alert('Failed to import DOCX template.');
+    } finally {
+      setIsSettingTemplate(false);
+    }
+  };
 
   // Persist session so teacher can rejoin after closing tab or navigating back
   useEffect(() => {
@@ -278,6 +333,27 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 </button>
                 <div className="text-xs text-gray-500 mt-1">
                   {sessionIsActive ? 'End the class to unlock CSV export' : 'CSV export unlocked'}
+                </div>
+
+                <div className="mt-4 text-left max-w-[420px]">
+                  <div className="text-xs font-medium text-gray-600 mb-2">
+                    Assignment template (DOCX) — applies to students when they join
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept=".docx"
+                      disabled={isSettingTemplate}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleSetTemplate(f);
+                      }}
+                      className="text-sm"
+                    />
+                    <div className="text-xs text-gray-500">
+                      {isSettingTemplate ? 'Importing…' : sessionHasTemplate ? 'Template set' : 'No template yet'}
+                    </div>
+                  </div>
                 </div>
             </div>
           </div>

@@ -10,3 +10,34 @@
   color: rgb(156 163 175); /* gray-400 */
   pointer-events: none;
 }
+
+/* Google-Docs-like typography + table rendering inside the student editor */
+.lockd-editor-area {
+  font-size: 12pt;
+  line-height: 1.5;
+  tab-size: 4;
+}
+
+.lockd-editor-area table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.lockd-editor-area td,
+.lockd-editor-area th {
+  border: 1px solid rgba(229, 231, 235, 1); /* gray-200 */
+  padding: 6px 8px;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.lockd-editor-area p {
+  margin: 0;
+}
+
+.lockd-editor-area ul,
+.lockd-editor-area ol {
+  margin: 0;
+  padding-left: 1.25em;
+}

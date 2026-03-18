@@ -8,6 +8,8 @@ export interface Database {
           teacher_id: string;
           teacher_peer_id: string | null;
           title: string;
+          assignment_template_html: string;
+          assignment_template_text: string;
           created_at: string;
           is_active: boolean;
         };
@@ -17,6 +19,8 @@ export interface Database {
           teacher_id: string;
           teacher_peer_id?: string | null;
           title: string;
+          assignment_template_html?: string;
+          assignment_template_text?: string;
           created_at?: string;
           is_active?: boolean;
         };
@@ -26,6 +30,8 @@ export interface Database {
           teacher_id?: string;
           teacher_peer_id?: string | null;
           title?: string;
+          assignment_template_html?: string;
+          assignment_template_text?: string;
           created_at?: string;
           is_active?: boolean;
         };

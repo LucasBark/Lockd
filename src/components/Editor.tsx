@@ -501,6 +501,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
 
         <div className="flex gap-4 flex-col lg:flex-row">
           <div className="flex-1 min-w-0">
+            <div className="max-w-[816px] mx-auto">
             <div className="sticky top-0 z-10 bg-white">
               <div className="flex flex-wrap items-center gap-2 border border-gray-200 rounded-lg p-2 mb-3">
                 <select
@@ -579,21 +580,22 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
               </div>
             </div>
 
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              spellCheck
-              onInput={handleEditorInput}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent overflow-auto"
-              style={{ fontFamily: fontCssFamily }}
-              data-placeholder="Start writing your work here..."
-            />
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck
+                onInput={handleEditorInput}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                className="lockd-editor-area w-full min-h-[600px] p-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent overflow-auto bg-white"
+                style={{ fontFamily: fontCssFamily }}
+                data-placeholder="Start writing your work here..."
+              />
 
             <div className="mt-2 text-sm text-gray-500">
               Last activity: {new Date(lastInput).toLocaleTimeString()}
+            </div>
             </div>
           </div>
 
