@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, MessageSquarePlus, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import mammoth from 'mammoth';
 
 type SuggestionRow = {
   id: string;
@@ -217,7 +216,11 @@ export function TeacherDocModal({
     setIsImportingDocx(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.convertToHtml({ arrayBuffer });
+      // Lazy-load so student routes aren't affected if DOCX features aren't used.
+      const mammothModule: any = await import('mammoth');
+      const converter = mammothModule?.convertToHtml ?? mammothModule?.default?.convertToHtml;
+      if (!converter) throw new Error('mammoth.convertToHtml not available');
+      const result = await converter({ arrayBuffer });
       const html = result.value ?? '';
       const tmp = document.createElement('div');
       tmp.innerHTML = html;
