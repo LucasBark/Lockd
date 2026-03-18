@@ -237,6 +237,77 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     updatePasteCount(pasteCount + 1);
   };
 
+  const getExportHtml = () => {
+    const { html, plain } = readEditor();
+    const safeHtml = (html || '').trim();
+    const safePlain = (plain || '').trim();
+    return {
+      html: safeHtml || safePlain.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('\n', '<br/>'),
+      plain: safePlain,
+    };
+  };
+
+  const exportToPdf = () => {
+    const { html } = getExportHtml();
+    const win = window.open('', '_blank', 'noopener,noreferrer');
+    if (!win) {
+      alert('Pop-up blocked. Please allow pop-ups to export to PDF.');
+      return;
+    }
+
+    win.document.open();
+    win.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Lockd Export</title>
+    <style>
+      @page { margin: 1in; }
+      body { font-family: ${fontCssFamily}; font-size: 12pt; line-height: 1.5; color: #111827; }
+      .doc { white-space: normal; }
+      mark { background: #fff59d; }
+    </style>
+  </head>
+  <body>
+    <div class="doc">${html}</div>
+    <script>
+      window.focus();
+      setTimeout(() => window.print(), 250);
+    </script>
+  </body>
+</html>`);
+    win.document.close();
+  };
+
+  const exportToDocx = () => {
+    // Word-compatible HTML download. Many systems open this in Word; if you need a true .docx zip,
+    // we can add a library-based exporter next.
+    const { html } = getExportHtml();
+    const doc = `<!doctype html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lockd Export</title>
+    <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+    <style>
+      body { font-family: ${fontCssFamily}; font-size: 12pt; line-height: 1.5; }
+      mark { background: #fff59d; }
+    </style>
+  </head>
+  <body>${html}</body>
+</html>`;
+
+    const blob = new Blob([doc], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lockd-export.doc';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
       <div className="max-w-4xl mx-auto">
@@ -326,8 +397,24 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                 <Highlighter className="w-4 h-4" />
               </button>
 
-              <div className="ml-auto text-xs text-gray-500">
-                Tab indents • Ctrl/Cmd+B/I/U work too
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={exportToPdf}
+                  className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 text-sm font-medium"
+                >
+                  Export PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={exportToDocx}
+                  className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 text-sm font-medium"
+                >
+                  Export DOC
+                </button>
+                <div className="hidden sm:block text-xs text-gray-500 ml-2">
+                  Tab indents • Ctrl/Cmd+B/I/U work too
+                </div>
               </div>
             </div>
           </div>

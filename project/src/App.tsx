@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { Home } from './components/Home';
+import { Landing } from './components/Landing';
 import { CreateSession } from './components/CreateSession';
 import { JoinSession } from './components/JoinSession';
 import { MonitorGrid } from './components/MonitorGrid';
@@ -61,6 +62,40 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+async function getUserRole(): Promise<'teacher' | 'student' | 'unknown'> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return 'unknown';
+  const meta = (data.user?.user_metadata ?? {}) as { role?: 'teacher' | 'student' };
+  if (meta.role === 'teacher' || meta.role === 'student') return meta.role;
+  return 'unknown';
+}
+
+function AuthedIndexRoute() {
+  const { isAuthed, isLoading } = useAuth();
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    if (isLoading) return;
+    if (!isAuthed) {
+      setTarget('/');
+      return;
+    }
+    getUserRole().then((role) => {
+      if (!mounted) return;
+      if (role === 'teacher') setTarget('/teacher/create');
+      else if (role === 'student') setTarget('/student/join');
+      else setTarget('/auth');
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthed, isLoading]);
+
+  if (isLoading || target === null) return null;
+  return <Navigate to={target} replace />;
+}
+
 function TeacherSessionRoute() {
   const { sessionId } = useParams();
   const [searchParams] = useSearchParams();
@@ -72,11 +107,23 @@ function TeacherSessionRoute() {
 
 function StudentEditorRoute() {
   const { sessionId, documentId } = useParams();
-  const [searchParams] = useSearchParams();
   const { userId } = useAuth();
 
-  const studentName = useMemo(() => searchParams.get('name') ?? '', [searchParams]);
+  const [studentName, setStudentName] = useState<string>('');
   const [teacherPeerId, setTeacherPeerId] = useState<string>('');
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) return;
+      const meta = (data.user?.user_metadata ?? {}) as { full_name?: string };
+      if (meta.full_name) setStudentName(meta.full_name);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Poll for teacher_peer_id until set (teacher may open dashboard after student)
   useEffect(() => {
@@ -130,6 +177,16 @@ function App() {
         <Route path="/auth" element={<Auth />} />
         <Route
           path="/"
+          element={
+            auth.isAuthed ? (
+              <AuthedIndexRoute />
+            ) : (
+              <Landing />
+            )
+          }
+        />
+        <Route
+          path="/home"
           element={
             <RequireAuth>
               <Home />

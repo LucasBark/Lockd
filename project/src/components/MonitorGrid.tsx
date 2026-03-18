@@ -23,6 +23,7 @@ interface MonitorGridProps {
 export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [students, setStudents] = useState<Map<string, StudentStatus>>(new Map());
   const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
+  const [sessionTitle, setSessionTitle] = useState<string>('');
   const handleHeartbeat = useCallback((data: StudentHeartbeat) => {
     setStudents((prev) => {
       const newMap = new Map(prev);
@@ -70,6 +71,26 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         });
     }
   }, [peerId, sessionId]);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase
+      .from('sessions')
+      .select('title')
+      .eq('id', sessionId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          console.error('Error fetching session title:', error);
+          return;
+        }
+        if (data?.title) setSessionTitle(data.title);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId]);
 
   // Persist session so teacher can rejoin after closing tab or navigating back
   useEffect(() => {
@@ -215,7 +236,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
             <div className="flex items-center gap-3">
               <Monitor className="w-8 h-8 text-blue-600" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">Lockd Dashboard</h1>
+                <h1 className="text-3xl font-bold text-gray-800">{sessionTitle || 'Class'}</h1>
                 <p className="text-gray-600">Session Code: <span className="font-mono font-bold text-blue-600">{sessionCode}</span></p>
               </div>
             </div>
