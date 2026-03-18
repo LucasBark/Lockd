@@ -188,7 +188,20 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
       if (hidden) {
         if (!tabbedOutLatchRef.current) {
           tabbedOutLatchRef.current = true;
-          incrementTabbedOutCount();
+          setTabbedOutCount((prev) => {
+            const next = prev + 1;
+            supabase
+              .from('documents')
+              .update({
+                tabbed_out_count: next,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', documentId)
+              .then(({ error }) => {
+                if (error) console.error('Error updating tabbed out count:', error);
+              });
+            return next;
+          });
         }
       } else {
         tabbedOutLatchRef.current = false;
@@ -210,7 +223,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
       window.removeEventListener('focus', handleWindowFocus);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [incrementTabbedOutCount]);
+  }, [documentId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
