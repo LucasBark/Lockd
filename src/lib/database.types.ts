@@ -41,6 +41,11 @@ export interface Database {
           content_text: string;
           paste_count: number;
           stagnant_count: number;
+          tabbed_out_count: number;
+          assignment_instructions_html: string;
+          assignment_instructions_text: string;
+          assignment_template_html: string;
+          assignment_template_text: string;
           last_activity: string;
           created_at: string;
           updated_at: string;
@@ -55,6 +60,11 @@ export interface Database {
           content_text?: string;
           paste_count?: number;
           stagnant_count?: number;
+          tabbed_out_count?: number;
+          assignment_instructions_html?: string;
+          assignment_instructions_text?: string;
+          assignment_template_html?: string;
+          assignment_template_text?: string;
           last_activity?: string;
           created_at?: string;
           updated_at?: string;
@@ -69,6 +79,11 @@ export interface Database {
           content_text?: string;
           paste_count?: number;
           stagnant_count?: number;
+          tabbed_out_count?: number;
+          assignment_instructions_html?: string;
+          assignment_instructions_text?: string;
+          assignment_template_html?: string;
+          assignment_template_text?: string;
           last_activity?: string;
           created_at?: string;
           updated_at?: string;

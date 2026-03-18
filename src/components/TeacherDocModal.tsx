@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, MessageSquarePlus, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import mammoth from 'mammoth';
 
 type SuggestionRow = {
   id: string;
@@ -26,6 +27,8 @@ export function TeacherDocModal({
   const [contentText, setContentText] = useState('');
   const [pasteCount, setPasteCount] = useState(0);
   const [stagnantCount, setStagnantCount] = useState(0);
+  const [assignmentInstructionsText, setAssignmentInstructionsText] = useState('');
+  const [assignmentInstructionsHtml, setAssignmentInstructionsHtml] = useState('');
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
 
   const [selectedText, setSelectedText] = useState('');
@@ -47,7 +50,13 @@ export function TeacherDocModal({
     setIsLoading(true);
 
     Promise.all([
-      supabase.from('documents').select('content,content_text,paste_count,stagnant_count').eq('id', documentId).maybeSingle(),
+      supabase
+        .from('documents')
+        .select(
+          'content,content_text,paste_count,stagnant_count,assignment_instructions_text,assignment_instructions_html'
+        )
+        .eq('id', documentId)
+        .maybeSingle(),
       supabase
         .from('document_suggestions')
         .select('*')
@@ -64,6 +73,8 @@ export function TeacherDocModal({
           setContentText(docRes.data.content_text ?? '');
           setPasteCount(typeof docRes.data.paste_count === 'number' ? docRes.data.paste_count : 0);
           setStagnantCount(typeof docRes.data.stagnant_count === 'number' ? docRes.data.stagnant_count : 0);
+          setAssignmentInstructionsText(docRes.data.assignment_instructions_text ?? '');
+          setAssignmentInstructionsHtml(docRes.data.assignment_instructions_html ?? '');
         }
         if (sugRes.data) setSuggestions(sugRes.data as SuggestionRow[]);
       })
@@ -77,11 +88,20 @@ export function TeacherDocModal({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'documents', filter: `id=eq.${documentId}` },
         (payload) => {
-          const next = payload.new as { content?: string; content_text?: string; paste_count?: number; stagnant_count?: number };
+          const next = payload.new as {
+            content?: string;
+            content_text?: string;
+            paste_count?: number;
+            stagnant_count?: number;
+            assignment_instructions_text?: string;
+            assignment_instructions_html?: string;
+          };
           if (typeof next.content === 'string') setContentHtml(next.content);
           if (typeof next.content_text === 'string') setContentText(next.content_text);
           if (typeof next.paste_count === 'number') setPasteCount(next.paste_count);
           if (typeof next.stagnant_count === 'number') setStagnantCount(next.stagnant_count);
+          if (typeof next.assignment_instructions_text === 'string') setAssignmentInstructionsText(next.assignment_instructions_text);
+          if (typeof next.assignment_instructions_html === 'string') setAssignmentInstructionsHtml(next.assignment_instructions_html);
         }
       )
       .subscribe();
@@ -167,6 +187,70 @@ export function TeacherDocModal({
     }
   };
 
+  const toHtmlFromPlain = (text: string) => {
+    const safe = (text ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+    return safe.replaceAll('\n', '<br/>');
+  };
+
+  const saveInstructions = async () => {
+    const plain = assignmentInstructionsText ?? '';
+    const html = toHtmlFromPlain(plain);
+    const { error } = await supabase
+      .from('documents')
+      .update({
+        assignment_instructions_text: plain,
+        assignment_instructions_html: html,
+      })
+      .eq('id', documentId);
+    if (error) {
+      console.error('Error saving instructions:', error);
+      alert('Failed to save instructions.');
+    }
+  };
+
+  const [isImportingDocx, setIsImportingDocx] = useState(false);
+
+  const importDocxTemplate = async (file: File) => {
+    setIsImportingDocx(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      const html = result.value ?? '';
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const plain = tmp.innerText ?? '';
+
+      const shouldApplyToContent = !contentText.trim();
+      const updatePayload: Record<string, unknown> = {
+        assignment_template_html: html,
+        assignment_template_text: plain,
+      };
+      if (shouldApplyToContent) {
+        updatePayload.content = html;
+        updatePayload.content_text = plain;
+        updatePayload.last_activity = new Date().toISOString();
+        updatePayload.updated_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase.from('documents').update(updatePayload).eq('id', documentId);
+      if (error) throw error;
+      if (shouldApplyToContent) {
+        setContentHtml(html);
+        setContentText(plain);
+      }
+
+      alert(shouldApplyToContent ? 'Template imported and inserted into the student doc.' : 'Template imported (student doc not overwritten).');
+    } catch (err) {
+      console.error('Docx import error:', err);
+      alert('Failed to import DOCX template.');
+    } finally {
+      setIsImportingDocx(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden">
@@ -192,6 +276,12 @@ export function TeacherDocModal({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
           <div className="p-5 border-b lg:border-b-0 lg:border-r">
             <div className="text-sm font-medium text-gray-700 mb-2">Preview (select text to anchor a suggestion)</div>
+            {assignmentInstructionsHtml ? (
+              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-800">
+                <div className="font-semibold text-gray-900 mb-1">Assignment instructions</div>
+                <div dangerouslySetInnerHTML={{ __html: assignmentInstructionsHtml }} />
+              </div>
+            ) : null}
             <textarea
               value={contentText}
               readOnly
@@ -212,6 +302,51 @@ export function TeacherDocModal({
           </div>
 
           <div className="p-5">
+            <div className="mb-5">
+              <div className="text-sm font-medium text-gray-700 mb-2">Assignment</div>
+
+              <div className="mb-3">
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Instructions (shown above the doc)
+                </label>
+                <textarea
+                  value={assignmentInstructionsText}
+                  onChange={(e) => setAssignmentInstructionsText(e.target.value)}
+                  className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="flex items-center justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={saveInstructions}
+                    className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+                  >
+                    Save instructions
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Import DOCX template (applies to students if their doc is empty)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".docx"
+                    className="text-sm"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) importDocxTemplate(f);
+                    }}
+                    disabled={isImportingDocx}
+                  />
+                  <div className="text-xs text-gray-500">
+                    {isImportingDocx ? 'Importing…' : 'Choose .docx file'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="text-sm font-medium text-gray-700">Suggestions</div>
               <div className="text-xs text-gray-500">{suggestions.length} total</div>
