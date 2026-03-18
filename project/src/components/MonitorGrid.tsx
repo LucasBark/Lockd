@@ -1,18 +1,14 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Monitor, User, Activity, FileText, Brain } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Monitor, User, Activity, FileText, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePeerConnection, StudentHeartbeat } from '../hooks/usePeerConnection';
-import { useWebLLM, ContentQuality } from '../hooks/useWebLLM';
-import { useAIVector } from '../hooks/useAIVector';
 import { TeacherDocModal } from './TeacherDocModal';
 
 interface StudentStatus extends StudentHeartbeat {
   documentId: string;
-  content: string;
-  quality: ContentQuality;
-  lastSeen: number;
   pasteCount: number;
   stagnantCount: number;
+  tabbedOutCount: number;
 }
 
 interface MonitorGridProps {
@@ -24,6 +20,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [students, setStudents] = useState<Map<string, StudentStatus>>(new Map());
   const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>('');
+  const [sessionIsActive, setSessionIsActive] = useState<boolean>(true);
   const handleHeartbeat = useCallback((data: StudentHeartbeat) => {
     setStudents((prev) => {
       const newMap = new Map(prev);
@@ -31,11 +28,9 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
       newMap.set(data.studentId, {
         ...data,
         documentId: existing?.documentId || '',
-        content: existing?.content || data.snippet,
-        quality: existing?.quality || 'Unknown',
-        lastSeen: Date.now(),
         pasteCount: existing?.pasteCount ?? 0,
         stagnantCount: existing?.stagnantCount ?? 0,
+        tabbedOutCount: existing?.tabbedOutCount ?? 0,
       });
       return newMap;
     });
@@ -44,20 +39,6 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const { peerId } = usePeerConnection({
     role: 'teacher',
     onReceiveHeartbeat: handleHeartbeat,
-  });
-
-  const { isLoading: aiLoading, loadingProgress, analyzeContent, isReady } = useWebLLM();
-  // Include all students with documents so AI runs without depending on P2P heartbeats
-  const activeStudentIds = useMemo(
-    () => Array.from(students.keys()),
-    [students]
-  );
-
-  const { qualities } = useAIVector({
-    sessionId,
-    enabled: isReady,
-    activeStudentIds,
-    analyzeContent,
   });
 
   useEffect(() => {
@@ -76,7 +57,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     let mounted = true;
     supabase
       .from('sessions')
-      .select('title')
+      .select('title,is_active')
       .eq('id', sessionId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -86,6 +67,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
           return;
         }
         if (data?.title) setSessionTitle(data.title);
+        if (typeof data?.is_active === 'boolean') setSessionIsActive(data.is_active);
       });
     return () => {
       mounted = false;
@@ -105,18 +87,6 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
       }
     }
   }, [sessionId, sessionCode]);
-
-  useEffect(() => {
-    if (!qualities || qualities.size === 0) return;
-    setStudents((prev) => {
-      const next = new Map(prev);
-      for (const [studentId, quality] of qualities.entries()) {
-        const current = next.get(studentId);
-        if (current) next.set(studentId, { ...current, quality });
-      }
-      return next;
-    });
-  }, [qualities]);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -139,15 +109,13 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
               studentId: doc.student_id,
               studentName: doc.student_name,
               documentId: doc.id,
-              content: doc.content,
               isTabActive: existing?.isTabActive ?? true,
               isWindowFocused: existing?.isWindowFocused ?? true,
               lastInput: existing?.lastInput ?? Date.now(),
               snippet: (doc.content_text ?? doc.content ?? '').substring(0, 200),
-              quality: existing?.quality || 'Unknown',
-              lastSeen: existing?.lastSeen || Date.now(),
               pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
               stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
+              tabbedOutCount: typeof doc.tabbed_out_count === 'number' ? doc.tabbed_out_count : (existing?.tabbedOutCount ?? 0),
             });
           });
           return newMap;
@@ -177,15 +145,13 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 studentId: doc.student_id,
                 studentName: doc.student_name,
                 documentId: doc.id,
-                content: doc.content,
                 isTabActive: existing?.isTabActive ?? true,
                 isWindowFocused: existing?.isWindowFocused ?? true,
                 lastInput: existing?.lastInput ?? Date.now(),
                 snippet: (doc.content_text ?? doc.content ?? '').substring(0, 200),
-                quality: existing?.quality || 'Unknown',
-                lastSeen: existing?.lastSeen || Date.now(),
                 pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
                 stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
+                tabbedOutCount: typeof doc.tabbed_out_count === 'number' ? doc.tabbed_out_count : (existing?.tabbedOutCount ?? 0),
               });
               return newMap;
             });
@@ -215,17 +181,67 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     return 'Active';
   };
 
-  const getQualityColor = (quality: ContentQuality) => {
-    switch (quality) {
-      case 'Productive':
-        return 'bg-green-100 text-green-700 border-green-300';
-      case 'Gibberish':
-        return 'bg-red-100 text-red-700 border-red-300';
-      case 'Analyzing':
-        return 'bg-blue-100 text-blue-700 border-blue-300';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-300';
+  const exportCsv = async () => {
+    if (sessionIsActive) return;
+
+    const { data, error } = await supabase
+      .from('documents')
+      .select('paste_count,stagnant_count,tabbed_out_count')
+      .eq('session_id', sessionId);
+
+    if (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Failed to export CSV.');
+      return;
     }
+
+    const rows = (data ?? []).map((doc, idx) => {
+      const pastes = typeof doc.paste_count === 'number' ? doc.paste_count : 0;
+      const stagnant = typeof doc.stagnant_count === 'number' ? doc.stagnant_count : 0;
+      const tabbedOut = typeof doc.tabbed_out_count === 'number' ? doc.tabbed_out_count : 0;
+      return {
+        Student: `Student ${idx + 1}`,
+        Pastes: pastes,
+        'Times stagnant': stagnant,
+        'Tabbed out': tabbedOut,
+      };
+    });
+
+    const headers = ['Student', 'Pastes', 'Times stagnant', 'Tabbed out'];
+    const escapeCsvValue = (v: unknown) => {
+      const s = String(v ?? '');
+      if (/[,"\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
+      return s;
+    };
+
+    const csvLines = [
+      headers.join(','),
+      ...rows.map((r) =>
+        headers
+          .map((h) => escapeCsvValue((r as Record<string, unknown>)[h]))
+          .join(',')
+      ),
+    ];
+
+    const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lockd-class-export.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const endClass = async () => {
+    const { error } = await supabase.from('sessions').update({ is_active: false }).eq('id', sessionId);
+    if (error) {
+      console.error('Error ending class:', error);
+      alert('Failed to end class.');
+      return;
+    }
+    setSessionIsActive(false);
   };
 
   return (
@@ -241,17 +257,28 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
               </div>
             </div>
             <div className="text-right">
-              <div className="flex items-center gap-2 mb-1">
-                <Brain className="w-5 h-5 text-purple-600" />
-                <span className="text-sm font-medium text-gray-700">AI Analysis</span>
-              </div>
-              {aiLoading ? (
-                <div className="text-sm text-gray-600">
-                  Loading AI Model: {loadingProgress}%
+                {sessionIsActive ? (
+                  <button
+                    type="button"
+                    onClick={endClass}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+                  >
+                    End class
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={exportCsv}
+                  disabled={sessionIsActive}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  title={sessionIsActive ? 'End class to export CSV' : 'Download class CSV'}
+                >
+                  <Download className="w-4 h-4" />
+                  Export CSV
+                </button>
+                <div className="text-xs text-gray-500 mt-1">
+                  {sessionIsActive ? 'End the class to unlock CSV export' : 'CSV export unlocked'}
                 </div>
-              ) : (
-                <div className="text-sm text-green-600">Ready</div>
-              )}
             </div>
           </div>
         </div>
@@ -284,9 +311,6 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                       student.isTabActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {getStatusLabel(student)}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-full border ${getQualityColor(student.quality)}`}>
-                      {student.quality}
                     </span>
                   </div>
                 </div>

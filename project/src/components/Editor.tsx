@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { FileText, Bold, Italic, Underline, Highlighter } from 'lucide-react';
+import { FileText, Bold, Italic, Underline, Highlighter, Copy, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePeerConnection, StudentHeartbeat } from '../hooks/usePeerConnection';
 
@@ -21,18 +21,43 @@ const FONT_OPTIONS: Array<{ label: string; value: string; cssFamily: string }> =
   { label: 'Comic Sans', value: 'Comic Sans MS', cssFamily: '"Comic Sans MS", "Comic Sans", cursive' },
 ];
 
+type SuggestionRow = {
+  id: string;
+  teacher_id: string;
+  selected_text: string;
+  context: string;
+  suggestion: string;
+  resolved: boolean;
+  created_at: string;
+};
+
 export function Editor({ sessionId, studentId, studentName, teacherPeerId, documentId }: EditorProps) {
   const [content, setContent] = useState(''); // stored as HTML
   const [contentText, setContentText] = useState(''); // plain text mirror
+  const [assignmentInstructionsHtml, setAssignmentInstructionsHtml] = useState('');
+  const [assignmentInstructionsText, setAssignmentInstructionsText] = useState('');
+  const [assignmentTemplateHtml, setAssignmentTemplateHtml] = useState('');
+  const [assignmentTemplateText, setAssignmentTemplateText] = useState('');
   const [pasteCount, setPasteCount] = useState(0);
   const [stagnantCount, setStagnantCount] = useState(0);
+  const [tabbedOutCount, setTabbedOutCount] = useState(0);
   const [lastInput, setLastInput] = useState(Date.now());
   const [isTabActive, setIsTabActive] = useState(true);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
   const saveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const stagnantLatchRef = useRef(false);
+  const tabbedOutLatchRef = useRef(false);
+  const templateAppliedRef = useRef(false);
   const [fontValue, setFontValue] = useState(FONT_OPTIONS[0].value);
+  const [copyStatus, setCopyStatus] = useState<string>('');
+  const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
+  const [formatActive, setFormatActive] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    highlight: false,
+  });
   const fontCssFamily = useMemo(
     () => (FONT_OPTIONS.find((f) => f.value === fontValue) ?? FONT_OPTIONS[0]).cssFamily,
     [fontValue]
@@ -60,7 +85,9 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     let mounted = true;
     supabase
       .from('documents')
-      .select('content,content_text,paste_count,stagnant_count')
+      .select(
+        'content,content_text,paste_count,stagnant_count,tabbed_out_count,assignment_instructions_html,assignment_instructions_text,assignment_template_html,assignment_template_text'
+      )
       .eq('id', documentId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -72,8 +99,13 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
         if (data) {
           setContent(data.content ?? '');
           setContentText(data.content_text ?? '');
+          setAssignmentInstructionsHtml(data.assignment_instructions_html ?? '');
+          setAssignmentInstructionsText(data.assignment_instructions_text ?? '');
+          setAssignmentTemplateHtml(data.assignment_template_html ?? '');
+          setAssignmentTemplateText(data.assignment_template_text ?? '');
           setPasteCount(typeof data.paste_count === 'number' ? data.paste_count : 0);
           setStagnantCount(typeof data.stagnant_count === 'number' ? data.stagnant_count : 0);
+          setTabbedOutCount(typeof data.tabbed_out_count === 'number' ? data.tabbed_out_count : 0);
         }
       });
 
@@ -83,8 +115,84 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
   }, [documentId, sessionId]);
 
   useEffect(() => {
+    const shouldApply = !templateAppliedRef.current && !contentText.trim() && !!assignmentTemplateHtml.trim();
+    if (!shouldApply) return;
+
+    templateAppliedRef.current = true;
+
+    setContent(assignmentTemplateHtml);
+    setContentText(assignmentTemplateText);
+
+    // Persist so teachers/other tabs see the populated content.
+    supabase
+      .from('documents')
+      .update({
+        content: assignmentTemplateHtml,
+        content_text: assignmentTemplateText,
+        last_activity: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', documentId)
+      .then(({ error }) => {
+        if (error) console.error('Error applying template:', error);
+      });
+  }, [assignmentTemplateHtml, assignmentTemplateText, contentText, documentId]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchSuggestions = async () => {
+      const { data, error } = await supabase
+        .from('document_suggestions')
+        .select('*')
+        .eq('document_id', documentId)
+        .order('created_at', { ascending: false });
+
+      if (!mounted) return;
+      if (error) {
+        console.error('Error loading suggestions:', error);
+        return;
+      }
+
+      setSuggestions((data ?? []) as SuggestionRow[]);
+    };
+
+    fetchSuggestions();
+
+    const channel = supabase
+      .channel(`student-suggestions-${documentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'document_suggestions',
+          filter: `document_id=eq.${documentId}`,
+        },
+        () => {
+          fetchSuggestions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      channel.unsubscribe();
+    };
+  }, [documentId]);
+
+  useEffect(() => {
     const handleVisibilityChange = () => {
-      setIsTabActive(!document.hidden);
+      const hidden = document.hidden;
+      setIsTabActive(!hidden);
+      if (hidden) {
+        if (!tabbedOutLatchRef.current) {
+          tabbedOutLatchRef.current = true;
+          incrementTabbedOutCount();
+        }
+      } else {
+        tabbedOutLatchRef.current = false;
+      }
     };
 
     const handleWindowFocus = () => setIsWindowFocused(true);
@@ -94,12 +202,15 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     window.addEventListener('focus', handleWindowFocus);
     window.addEventListener('blur', handleWindowBlur);
 
+    // Sync initial state.
+    handleVisibilityChange();
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleWindowFocus);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, []);
+  }, [incrementTabbedOutCount]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -166,33 +277,56 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     scheduleSave(html, plain);
   };
 
-  const updatePasteCount = useCallback((next: number) => {
-    setPasteCount(next);
-    supabase
-      .from('documents')
-      .update({
-        paste_count: next,
-        last_activity: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', documentId)
-      .then(({ error }) => {
-        if (error) console.error('Error updating paste count:', error);
-      });
+  const incrementPasteCount = useCallback(() => {
+    setPasteCount((prev) => {
+      const next = prev + 1;
+      supabase
+        .from('documents')
+        .update({
+          paste_count: next,
+          last_activity: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', documentId)
+        .then(({ error }) => {
+          if (error) console.error('Error updating paste count:', error);
+        });
+      return next;
+    });
   }, [documentId]);
 
-  const updateStagnantCount = useCallback((next: number) => {
-    setStagnantCount(next);
-    supabase
-      .from('documents')
-      .update({
-        stagnant_count: next,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', documentId)
-      .then(({ error }) => {
-        if (error) console.error('Error updating stagnant count:', error);
-      });
+  const incrementStagnantCount = useCallback(() => {
+    setStagnantCount((prev) => {
+      const next = prev + 1;
+      supabase
+        .from('documents')
+        .update({
+          stagnant_count: next,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', documentId)
+        .then(({ error }) => {
+          if (error) console.error('Error updating stagnant count:', error);
+        });
+      return next;
+    });
+  }, [documentId]);
+
+  const incrementTabbedOutCount = useCallback(() => {
+    setTabbedOutCount((prev) => {
+      const next = prev + 1;
+      supabase
+        .from('documents')
+        .update({
+          tabbed_out_count: next,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', documentId)
+        .then(({ error }) => {
+          if (error) console.error('Error updating tabbed out count:', error);
+        });
+      return next;
+    });
   }, [documentId]);
 
   useEffect(() => {
@@ -205,7 +339,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
       if (inactiveFor > INACTIVITY_MS) {
         if (!stagnantLatchRef.current) {
           stagnantLatchRef.current = true;
-          updateStagnantCount(stagnantCount + 1);
+          incrementStagnantCount();
         }
       } else {
         stagnantLatchRef.current = false;
@@ -213,7 +347,41 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     }, STAGNANT_CHECK_MS);
 
     return () => window.clearInterval(interval);
-  }, [isTabActive, isWindowFocused, lastInput, stagnantCount, updateStagnantCount]);
+  }, [isTabActive, isWindowFocused, lastInput, incrementStagnantCount]);
+
+  const updateFormatActive = useCallback(() => {
+    const el = editorRef.current;
+    const sel = window.getSelection();
+    if (!el || !sel || !sel.anchorNode) {
+      setFormatActive({ bold: false, italic: false, underline: false, highlight: false });
+      return;
+    }
+
+    const isInsideEditor = el.contains(sel.anchorNode);
+    if (!isInsideEditor) {
+      setFormatActive({ bold: false, italic: false, underline: false, highlight: false });
+      return;
+    }
+
+    const boldActive = !!document.queryCommandState('bold');
+    const italicActive = !!document.queryCommandState('italic');
+    const underlineActive = !!document.queryCommandState('underline');
+    const highlightActive = !!document.queryCommandState('hiliteColor') || !!document.queryCommandState('backColor');
+
+    setFormatActive({
+      bold: boldActive,
+      italic: italicActive,
+      underline: underlineActive,
+      highlight: highlightActive,
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = () => updateFormatActive();
+    document.addEventListener('selectionchange', handler);
+    handler();
+    return () => document.removeEventListener('selectionchange', handler);
+  }, [updateFormatActive]);
 
   const applyCommand = (command: string, value?: string) => {
     // execCommand is deprecated but still works across modern browsers for simple formatting.
@@ -221,12 +389,13 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     // input event isn't guaranteed to fire for execCommand in all cases
     handleEditorInput();
     editorRef.current?.focus();
+    updateFormatActive();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Tab') {
       e.preventDefault();
-      applyCommand('insertText', '    ');
+      applyCommand('insertText', '\t');
     }
   };
 
@@ -234,83 +403,46 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
     applyCommand('insertText', text);
-    updatePasteCount(pasteCount + 1);
+    incrementPasteCount();
   };
 
-  const getExportHtml = () => {
-    const { html, plain } = readEditor();
-    const safeHtml = (html || '').trim();
-    const safePlain = (plain || '').trim();
-    return {
-      html: safeHtml || safePlain.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('\n', '<br/>'),
-      plain: safePlain,
-    };
-  };
-
-  const exportToPdf = () => {
-    const { html } = getExportHtml();
-    const win = window.open('', '_blank', 'noopener,noreferrer');
-    if (!win) {
-      alert('Pop-up blocked. Please allow pop-ups to export to PDF.');
+  const copyText = async () => {
+    const text = (contentText || '').trim();
+    if (!text) {
+      setCopyStatus('Nothing to copy');
+      window.setTimeout(() => setCopyStatus(''), 1500);
       return;
     }
 
-    win.document.open();
-    win.document.write(`<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Lockd Export</title>
-    <style>
-      @page { margin: 1in; }
-      body { font-family: ${fontCssFamily}; font-size: 12pt; line-height: 1.5; color: #111827; }
-      .doc { white-space: normal; }
-      mark { background: #fff59d; }
-    </style>
-  </head>
-  <body>
-    <div class="doc">${html}</div>
-    <script>
-      window.focus();
-      setTimeout(() => window.print(), 250);
-    </script>
-  </body>
-</html>`);
-    win.document.close();
-  };
-
-  const exportToDocx = () => {
-    // Word-compatible HTML download. Many systems open this in Word; if you need a true .docx zip,
-    // we can add a library-based exporter next.
-    const { html } = getExportHtml();
-    const doc = `<!doctype html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-  <head>
-    <meta charset="utf-8" />
-    <title>Lockd Export</title>
-    <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
-    <style>
-      body { font-family: ${fontCssFamily}; font-size: 12pt; line-height: 1.5; }
-      mark { background: #fff59d; }
-    </style>
-  </head>
-  <body>${html}</body>
-</html>`;
-
-    const blob = new Blob([doc], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'lockd-export.doc';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus('Copied');
+    } catch {
+      // Fallback for browsers/environments without clipboard permissions.
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        setCopyStatus('Copied');
+      } catch {
+        alert('Copy failed. Please try again.');
+      } finally {
+        ta.remove();
+      }
+    } finally {
+      window.setTimeout(() => setCopyStatus(''), 1500);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -342,99 +474,169 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
             <div className="px-3 py-1 rounded-full text-sm bg-amber-50 text-amber-800 border border-amber-200">
               Stagnant: {stagnantCount}
             </div>
-          </div>
-
-          <div className="sticky top-0 z-10 bg-white">
-            <div className="flex flex-wrap items-center gap-2 border border-gray-200 rounded-lg p-2 mb-3">
-              <select
-                value={fontValue}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setFontValue(next);
-                  applyCommand('fontName', next);
-                }}
-                className="px-2 py-1 border border-gray-200 rounded-md text-sm bg-white"
-              >
-                {FONT_OPTIONS.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-
-              <div className="h-6 w-px bg-gray-200 mx-1" />
-
-              <button
-                type="button"
-                onClick={() => applyCommand('bold')}
-                className="p-2 rounded-md hover:bg-gray-100"
-                aria-label="Bold"
-              >
-                <Bold className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyCommand('italic')}
-                className="p-2 rounded-md hover:bg-gray-100"
-                aria-label="Italic"
-              >
-                <Italic className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyCommand('underline')}
-                className="p-2 rounded-md hover:bg-gray-100"
-                aria-label="Underline"
-              >
-                <Underline className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyCommand('hiliteColor', '#fff59d')}
-                className="p-2 rounded-md hover:bg-gray-100"
-                aria-label="Highlight"
-              >
-                <Highlighter className="w-4 h-4" />
-              </button>
-
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={exportToPdf}
-                  className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 text-sm font-medium"
-                >
-                  Export PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={exportToDocx}
-                  className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 text-sm font-medium"
-                >
-                  Export DOC
-                </button>
-                <div className="hidden sm:block text-xs text-gray-500 ml-2">
-                  Tab indents • Ctrl/Cmd+B/I/U work too
-                </div>
-              </div>
+            <div className="px-3 py-1 rounded-full text-sm bg-sky-50 text-sky-800 border border-sky-200">
+              Tabbed out: {tabbedOutCount}
             </div>
           </div>
 
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            spellCheck
-            onInput={handleEditorInput}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent overflow-auto"
-            style={{ fontFamily: fontCssFamily }}
-            data-placeholder="Start writing your work here..."
-          />
+          {assignmentInstructionsHtml ? (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-800">
+              <div className="font-semibold text-gray-900 mb-1">Assignment instructions</div>
+              <div dangerouslySetInnerHTML={{ __html: assignmentInstructionsHtml }} />
+            </div>
+          ) : null}
 
-          <div className="mt-2 text-sm text-gray-500">
-            Last activity: {new Date(lastInput).toLocaleTimeString()}
+        <div className="flex gap-4 flex-col lg:flex-row">
+          <div className="flex-1 min-w-0">
+            <div className="sticky top-0 z-10 bg-white">
+              <div className="flex flex-wrap items-center gap-2 border border-gray-200 rounded-lg p-2 mb-3">
+                <select
+                  value={fontValue}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setFontValue(next);
+                    applyCommand('fontName', next);
+                  }}
+                  className="px-2 py-1 border border-gray-200 rounded-md text-sm bg-white"
+                >
+                  {FONT_OPTIONS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                <button
+                  type="button"
+                  onClick={() => applyCommand('bold')}
+                  className={`p-2 rounded-md hover:bg-gray-100 ${
+                    formatActive.bold ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  }`}
+                  aria-label="Bold"
+                >
+                  <Bold className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCommand('italic')}
+                  className={`p-2 rounded-md hover:bg-gray-100 ${
+                    formatActive.italic ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  }`}
+                  aria-label="Italic"
+                >
+                  <Italic className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCommand('underline')}
+                  className={`p-2 rounded-md hover:bg-gray-100 ${
+                    formatActive.underline ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  }`}
+                  aria-label="Underline"
+                >
+                  <Underline className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCommand('hiliteColor', '#fff59d')}
+                  className={`p-2 rounded-md hover:bg-gray-100 ${
+                    formatActive.highlight ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  }`}
+                  aria-label="Highlight"
+                >
+                  <Highlighter className="w-4 h-4" />
+                </button>
+
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={copyText}
+                    disabled={!contentText.trim()}
+                    className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy text
+                  </button>
+                  {copyStatus ? (
+                    <span className="text-xs text-blue-700 font-medium">{copyStatus}</span>
+                  ) : null}
+                  <div className="hidden sm:block text-xs text-gray-500 ml-2">
+                    Tab inserts a real tab character (U+0009)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck
+              onInput={handleEditorInput}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent overflow-auto"
+              style={{ fontFamily: fontCssFamily }}
+              data-placeholder="Start writing your work here..."
+            />
+
+            <div className="mt-2 text-sm text-gray-500">
+              Last activity: {new Date(lastInput).toLocaleTimeString()}
+            </div>
           </div>
+
+          <aside className="w-full lg:w-80 shrink-0">
+            <div className="sticky top-24">
+              <div className="border border-gray-200 rounded-lg p-3 bg-white">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MessageSquare className="w-4 h-4 text-blue-600" />
+                    <div className="text-sm font-semibold text-gray-800 truncate">Teacher Suggestions</div>
+                  </div>
+                  <div className="text-xs text-gray-500">{suggestions.length}</div>
+                </div>
+
+                <div className="max-h-[620px] overflow-auto pr-1 space-y-3">
+                  {suggestions.length === 0 ? (
+                    <div className="text-sm text-gray-500">No teacher suggestions yet.</div>
+                  ) : (
+                    suggestions.map((s) => (
+                      <div
+                        key={s.id}
+                        className={`border rounded-lg p-3 ${
+                          s.resolved ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            {s.selected_text ? (
+                              <div className="text-xs text-gray-600 mb-1 truncate">
+                                On: <span className="font-medium">"{s.selected_text}"</span>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400 mb-1">No selection</div>
+                            )}
+                            <div className={`text-sm ${s.resolved ? 'text-green-900' : 'text-gray-900'}`}>{s.suggestion}</div>
+                            <div className="text-xs text-gray-500 mt-1">{new Date(s.created_at).toLocaleString()}</div>
+                          </div>
+                          <div
+                            className={`shrink-0 text-xs font-medium px-2 py-1 rounded-md ${
+                              s.resolved ? 'bg-green-600 text-white' : 'bg-blue-50 text-blue-700'
+                            }`}
+                          >
+                            {s.resolved ? 'Resolved' : 'Open'}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
         </div>
       </div>
     </div>
