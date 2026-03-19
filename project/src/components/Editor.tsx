@@ -575,9 +575,6 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                   {copyStatus ? (
                     <span className="text-xs text-blue-700 font-medium">{copyStatus}</span>
                   ) : null}
-                  <div className="hidden sm:block text-xs text-gray-500 ml-2">
-                    Tab inserts a real tab character (U+0009)
-                  </div>
                 </div>
               </div>
             </div>

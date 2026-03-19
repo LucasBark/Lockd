@@ -35,7 +35,9 @@ export function JoinSession({ userId }: JoinSessionProps) {
     try {
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
-        .select('id,assignment_template_html,assignment_template_text')
+        .select(
+          'id,assignment_template_html,assignment_template_text,assignment_instructions_html,assignment_instructions_text,todo_list_json'
+        )
         .eq('code', code.toUpperCase().trim())
         .eq('is_active', true)
         .maybeSingle();
@@ -73,6 +75,9 @@ export function JoinSession({ userId }: JoinSessionProps) {
           content_text: '',
           assignment_template_html: sessionData.assignment_template_html ?? '',
           assignment_template_text: sessionData.assignment_template_text ?? '',
+          assignment_instructions_html: sessionData.assignment_instructions_html ?? '',
+          assignment_instructions_text: sessionData.assignment_instructions_text ?? '',
+          todo_list_json: sessionData.todo_list_json ?? [],
         })
         .select()
         .single();

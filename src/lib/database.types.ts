@@ -10,6 +10,10 @@ export interface Database {
           title: string;
           assignment_template_html: string;
           assignment_template_text: string;
+          assignment_instructions_html: string;
+          assignment_instructions_text: string;
+          todo_list_json: Array<{ id: string; text: string; completed: boolean }>;
+          ended_at: string | null;
           created_at: string;
           is_active: boolean;
         };
@@ -21,6 +25,10 @@ export interface Database {
           title: string;
           assignment_template_html?: string;
           assignment_template_text?: string;
+          assignment_instructions_html?: string;
+          assignment_instructions_text?: string;
+          todo_list_json?: Array<{ id: string; text: string; completed: boolean }>;
+          ended_at?: string | null;
           created_at?: string;
           is_active?: boolean;
         };
@@ -32,6 +40,10 @@ export interface Database {
           title?: string;
           assignment_template_html?: string;
           assignment_template_text?: string;
+          assignment_instructions_html?: string;
+          assignment_instructions_text?: string;
+          todo_list_json?: Array<{ id: string; text: string; completed: boolean }>;
+          ended_at?: string | null;
           created_at?: string;
           is_active?: boolean;
         };
@@ -52,6 +64,7 @@ export interface Database {
           assignment_instructions_text: string;
           assignment_template_html: string;
           assignment_template_text: string;
+          todo_list_json: Array<{ id: string; text: string; completed: boolean }>;
           last_activity: string;
           created_at: string;
           updated_at: string;
@@ -71,6 +84,7 @@ export interface Database {
           assignment_instructions_text?: string;
           assignment_template_html?: string;
           assignment_template_text?: string;
+          todo_list_json?: Array<{ id: string; text: string; completed: boolean }>;
           last_activity?: string;
           created_at?: string;
           updated_at?: string;
@@ -90,6 +104,7 @@ export interface Database {
           assignment_instructions_text?: string;
           assignment_template_html?: string;
           assignment_template_text?: string;
+          todo_list_json?: Array<{ id: string; text: string; completed: boolean }>;
           last_activity?: string;
           created_at?: string;
           updated_at?: string;
