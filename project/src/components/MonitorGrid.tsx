@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Monitor, User, Activity, FileText, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePeerConnection, StudentHeartbeat } from '../hooks/usePeerConnection';
@@ -21,6 +21,46 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>('');
   const [sessionIsActive, setSessionIsActive] = useState<boolean>(true);
+  const [sessionHasTemplate, setSessionHasTemplate] = useState<boolean>(false);
+  const [isSettingTemplate, setIsSettingTemplate] = useState(false);
+  const [sessionEndedAt, setSessionEndedAt] = useState<string | null>(null);
+  const [cleanupCountdownMs, setCleanupCountdownMs] = useState<number | null>(null);
+  const [sessionInstructionsText, setSessionInstructionsText] = useState<string>('');
+  const [sessionTodoText, setSessionTodoText] = useState<string>('');
+  const [isSettingInstructions, setIsSettingInstructions] = useState(false);
+  const [isSettingTodo, setIsSettingTodo] = useState(false);
+
+  const cleanupDoneRef = useRef(false);
+
+  const toHtmlFromPlain = useCallback((text: string) => {
+    const safe = (text ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+    return safe.replaceAll('\n', '<br/>');
+  }, []);
+
+  const todoTextToJson = useCallback((text: string) => {
+    const lines = (text ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    return lines.map((t, idx) => ({
+      id: String(idx),
+      text: t,
+      completed: false,
+    }));
+  }, []);
+
+  const todoJsonToText = useCallback((json: unknown) => {
+    const arr = Array.isArray(json) ? json : [];
+    return arr
+      .map((item) => (item as any)?.text)
+      .filter((t) => typeof t === 'string' && t.trim().length > 0)
+      .map((t) => (t as string).trim())
+      .join('\n');
+  }, []);
   const handleHeartbeat = useCallback((data: StudentHeartbeat) => {
     setStudents((prev) => {
       const newMap = new Map(prev);
@@ -57,7 +97,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     let mounted = true;
     supabase
       .from('sessions')
-      .select('title,is_active')
+      .select('title,is_active,ended_at,assignment_template_text,assignment_instructions_text,todo_list_json')
       .eq('id', sessionId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -68,11 +108,143 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         }
         if (data?.title) setSessionTitle(data.title);
         if (typeof data?.is_active === 'boolean') setSessionIsActive(data.is_active);
+        if (typeof data?.ended_at === 'string') setSessionEndedAt(data.ended_at);
+        if (typeof data?.assignment_template_text === 'string') {
+          setSessionHasTemplate(data.assignment_template_text.trim().length > 0);
+        }
+        if (typeof data?.assignment_instructions_text === 'string') {
+          setSessionInstructionsText(data.assignment_instructions_text);
+        }
+        if (typeof data?.todo_list_json !== 'undefined') {
+          setSessionTodoText(todoJsonToText(data.todo_list_json));
+        }
       });
     return () => {
       mounted = false;
     };
   }, [sessionId]);
+
+  const handleSetTemplate = async (file: File) => {
+    setIsSettingTemplate(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+
+      const mammothModule: any = await import('mammoth');
+      const converter = mammothModule?.convertToHtml ?? mammothModule?.default?.convertToHtml;
+      if (!converter) throw new Error('mammoth.convertToHtml not available');
+
+      const result = await converter({ arrayBuffer });
+      const html = result.value ?? '';
+
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const plain = tmp.innerText ?? '';
+
+      const { error } = await supabase
+        .from('sessions')
+        .update({
+          assignment_template_html: html,
+          assignment_template_text: plain,
+        })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      setSessionHasTemplate(plain.trim().length > 0);
+
+      const tableFound = html.toLowerCase().includes('<table');
+      if (!tableFound) {
+        alert(
+          'Template imported, but no tables were detected in the converted content. Some DOCX table layouts may not convert reliably.'
+        );
+      }
+
+      // Apply to any existing student docs that are still empty.
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('documents')
+        .update({
+          assignment_template_html: html,
+          assignment_template_text: plain,
+          content: html,
+          content_text: plain,
+          last_activity: nowIso,
+          updated_at: nowIso,
+        })
+        .eq('session_id', sessionId)
+        .eq('content_text', '');
+    } catch (err) {
+      console.error('Error setting DOCX template:', err);
+      alert('Failed to import DOCX template.');
+    } finally {
+      setIsSettingTemplate(false);
+    }
+  };
+
+  const handleSetInstructions = async () => {
+    setIsSettingInstructions(true);
+    try {
+      const plain = sessionInstructionsText ?? '';
+      const html = toHtmlFromPlain(plain);
+
+      const { error } = await supabase
+        .from('sessions')
+        .update({
+          assignment_instructions_html: html,
+          assignment_instructions_text: plain,
+        })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('documents')
+        .update({
+          assignment_instructions_html: html,
+          assignment_instructions_text: plain,
+          updated_at: nowIso,
+        })
+        .eq('session_id', sessionId)
+        .eq('content_text', '');
+    } catch (err) {
+      console.error('Error setting instructions:', err);
+      alert('Failed to save instructions.');
+    } finally {
+      setIsSettingInstructions(false);
+    }
+  };
+
+  const handleSetTodo = async () => {
+    setIsSettingTodo(true);
+    try {
+      const todoJson = todoTextToJson(sessionTodoText ?? '');
+
+      const { error } = await supabase
+        .from('sessions')
+        .update({
+          todo_list_json: todoJson,
+        })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      const { error: docsErr } = await supabase
+        .from('documents')
+        .update({
+          todo_list_json: todoJson,
+        })
+        .eq('session_id', sessionId)
+        .eq('content_text', '');
+
+      if (docsErr) throw docsErr;
+    } catch (err) {
+      console.error('Error setting todos:', err);
+      alert('Failed to save class to-do list.');
+    } finally {
+      setIsSettingTodo(false);
+    }
+  };
 
   // Persist session so teacher can rejoin after closing tab or navigating back
   useEffect(() => {
@@ -186,7 +358,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
 
     const { data, error } = await supabase
       .from('documents')
-      .select('paste_count,stagnant_count,tabbed_out_count')
+      .select('content_text,paste_count,stagnant_count,tabbed_out_count')
       .eq('session_id', sessionId);
 
     if (error) {
@@ -199,15 +371,17 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
       const pastes = typeof doc.paste_count === 'number' ? doc.paste_count : 0;
       const stagnant = typeof doc.stagnant_count === 'number' ? doc.stagnant_count : 0;
       const tabbedOut = typeof doc.tabbed_out_count === 'number' ? doc.tabbed_out_count : 0;
+      const studentWork = typeof doc.content_text === 'string' ? doc.content_text : '';
       return {
         Student: `Student ${idx + 1}`,
         Pastes: pastes,
         'Times stagnant': stagnant,
         'Tabbed out': tabbedOut,
+        'Student work': studentWork,
       };
     });
 
-    const headers = ['Student', 'Pastes', 'Times stagnant', 'Tabbed out'];
+    const headers = ['Student', 'Pastes', 'Times stagnant', 'Tabbed out', 'Student work'];
     const escapeCsvValue = (v: unknown) => {
       const s = String(v ?? '');
       if (/[,"\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
@@ -234,14 +408,85 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     URL.revokeObjectURL(url);
   };
 
+  const cleanupSessionData = useCallback(async () => {
+    if (cleanupDoneRef.current) return;
+    cleanupDoneRef.current = true;
+    try {
+      // Delete dependent rows via FK cascades.
+      const { error: docsError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('session_id', sessionId);
+      if (docsError) throw docsError;
+
+      const { error: sessionsError } = await supabase
+        .from('sessions')
+        .delete()
+        .eq('id', sessionId);
+      if (sessionsError) throw sessionsError;
+    } catch (err) {
+      console.error('Error cleaning up session data:', err);
+      // Don't keep the user in a broken state; allow them to keep working if cleanup fails.
+      alert('Automatic cleanup failed. You may need to delete the session manually.');
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (sessionIsActive) return;
+    if (!sessionEndedAt) return;
+
+    const endedMs = new Date(sessionEndedAt).getTime();
+    const deleteAt = endedMs + 10 * 60 * 1000;
+    const msUntilDelete = deleteAt - Date.now();
+
+    if (msUntilDelete <= 0) {
+      cleanupSessionData();
+      return;
+    }
+
+    const t = window.setTimeout(() => {
+      cleanupSessionData();
+    }, msUntilDelete);
+
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [sessionIsActive, sessionEndedAt, cleanupSessionData]);
+
+  useEffect(() => {
+    if (sessionIsActive || !sessionEndedAt) {
+      setCleanupCountdownMs(null);
+      return;
+    }
+
+    const update = () => {
+      const endedMs = new Date(sessionEndedAt).getTime();
+      const deleteAt = endedMs + 10 * 60 * 1000;
+      const ms = Math.max(0, deleteAt - Date.now());
+      setCleanupCountdownMs(ms);
+    };
+
+    update();
+    const i = window.setInterval(update, 1000);
+    return () => window.clearInterval(i);
+  }, [sessionIsActive, sessionEndedAt]);
+
   const endClass = async () => {
-    const { error } = await supabase.from('sessions').update({ is_active: false }).eq('id', sessionId);
+    const confirmed = window.confirm('This will end the class. Session data will be deleted from the database 10 minutes after end.');
+    if (!confirmed) return;
+
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from('sessions')
+      .update({ is_active: false, ended_at: nowIso })
+      .eq('id', sessionId);
     if (error) {
       console.error('Error ending class:', error);
       alert('Failed to end class.');
       return;
     }
     setSessionIsActive(false);
+    setSessionEndedAt(nowIso);
   };
 
   return (
@@ -278,6 +523,78 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 </button>
                 <div className="text-xs text-gray-500 mt-1">
                   {sessionIsActive ? 'End the class to unlock CSV export' : 'CSV export unlocked'}
+                </div>
+
+                {!sessionIsActive && sessionEndedAt && cleanupCountdownMs !== null ? (
+                  <div className="text-xs text-gray-500 mt-2">
+                    Session data will be deleted in{' '}
+                    <span className="font-mono font-semibold">
+                      {Math.floor(cleanupCountdownMs / 60000)}m:{String(Math.floor((cleanupCountdownMs % 60000) / 1000)).padStart(2, '0')}s
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="mt-4 text-left max-w-[420px]">
+                  <div className="text-xs font-medium text-gray-600 mb-2">
+                    Assignment template (DOCX) — applies to students when they join
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept=".docx"
+                      disabled={isSettingTemplate}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleSetTemplate(f);
+                      }}
+                      className="text-sm"
+                    />
+                    <div className="text-xs text-gray-500">
+                      {isSettingTemplate ? 'Importing…' : sessionHasTemplate ? 'Template set' : 'No template yet'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-left max-w-[420px]">
+                  <div className="text-xs font-medium text-gray-600 mb-2">Assignment instructions (plain text)</div>
+                  <textarea
+                    value={sessionInstructionsText}
+                    onChange={(e) => setSessionInstructionsText(e.target.value)}
+                    className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter instructions. Use new lines for paragraphs."
+                    disabled={isSettingInstructions}
+                  />
+                  <div className="flex items-center justify-end mt-2">
+                    <button
+                      type="button"
+                      onClick={handleSetInstructions}
+                      disabled={isSettingInstructions}
+                      className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:bg-gray-300 disabled:text-gray-500"
+                    >
+                      {isSettingInstructions ? 'Saving…' : 'Set instructions'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-left max-w-[420px]">
+                  <div className="text-xs font-medium text-gray-600 mb-2">Class to-do list (one task per line)</div>
+                  <textarea
+                    value={sessionTodoText}
+                    onChange={(e) => setSessionTodoText(e.target.value)}
+                    className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Write your thesis (one task per line)"
+                    disabled={isSettingTodo}
+                  />
+                  <div className="flex items-center justify-end mt-2">
+                    <button
+                      type="button"
+                      onClick={handleSetTodo}
+                      disabled={isSettingTodo}
+                      className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:bg-gray-300 disabled:text-gray-500"
+                    >
+                      {isSettingTodo ? 'Saving…' : 'Set to-do'}
+                    </button>
+                  </div>
                 </div>
             </div>
           </div>

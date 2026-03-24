@@ -31,6 +31,8 @@ type SuggestionRow = {
   created_at: string;
 };
 
+type TodoItem = { id: string; text: string; completed: boolean };
+
 export function Editor({ sessionId, studentId, studentName, teacherPeerId, documentId }: EditorProps) {
   const [content, setContent] = useState(''); // stored as HTML
   const [contentText, setContentText] = useState(''); // plain text mirror
@@ -38,6 +40,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
   const [assignmentInstructionsText, setAssignmentInstructionsText] = useState('');
   const [assignmentTemplateHtml, setAssignmentTemplateHtml] = useState('');
   const [assignmentTemplateText, setAssignmentTemplateText] = useState('');
+  const [todoList, setTodoList] = useState<TodoItem[]>([]);
   const [pasteCount, setPasteCount] = useState(0);
   const [stagnantCount, setStagnantCount] = useState(0);
   const [tabbedOutCount, setTabbedOutCount] = useState(0);
@@ -49,6 +52,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
   const stagnantLatchRef = useRef(false);
   const tabbedOutLatchRef = useRef(false);
   const templateAppliedRef = useRef(false);
+  const contentTextRef = useRef(contentText);
   const [fontValue, setFontValue] = useState(FONT_OPTIONS[0].value);
   const [copyStatus, setCopyStatus] = useState<string>('');
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
@@ -86,7 +90,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     supabase
       .from('documents')
       .select(
-        'content,content_text,paste_count,stagnant_count,tabbed_out_count,assignment_instructions_html,assignment_instructions_text,assignment_template_html,assignment_template_text'
+        'content,content_text,paste_count,stagnant_count,tabbed_out_count,assignment_instructions_html,assignment_instructions_text,assignment_template_html,assignment_template_text,todo_list_json'
       )
       .eq('id', documentId)
       .maybeSingle()
@@ -103,6 +107,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
           setAssignmentInstructionsText(data.assignment_instructions_text ?? '');
           setAssignmentTemplateHtml(data.assignment_template_html ?? '');
           setAssignmentTemplateText(data.assignment_template_text ?? '');
+          setTodoList((data.todo_list_json as TodoItem[]) ?? []);
           setPasteCount(typeof data.paste_count === 'number' ? data.paste_count : 0);
           setStagnantCount(typeof data.stagnant_count === 'number' ? data.stagnant_count : 0);
           setTabbedOutCount(typeof data.tabbed_out_count === 'number' ? data.tabbed_out_count : 0);
@@ -137,6 +142,51 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
         if (error) console.error('Error applying template:', error);
       });
   }, [assignmentTemplateHtml, assignmentTemplateText, contentText, documentId]);
+
+  useEffect(() => {
+    contentTextRef.current = contentText;
+  }, [contentText]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`student-doc-${documentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'documents',
+          filter: `id=eq.${documentId}`,
+        },
+        (payload) => {
+          const next = payload.new as any;
+
+          if (typeof next.assignment_instructions_html === 'string') setAssignmentInstructionsHtml(next.assignment_instructions_html);
+          if (typeof next.assignment_instructions_text === 'string') setAssignmentInstructionsText(next.assignment_instructions_text);
+          if (typeof next.assignment_template_html === 'string') setAssignmentTemplateHtml(next.assignment_template_html);
+          if (typeof next.assignment_template_text === 'string') setAssignmentTemplateText(next.assignment_template_text);
+
+          if (Array.isArray(next.todo_list_json)) setTodoList(next.todo_list_json as TodoItem[]);
+
+          const incomingContentText = typeof next.content_text === 'string' ? next.content_text : '';
+          if (contentTextRef.current.trim().length === 0 && incomingContentText.trim().length > 0) {
+            // Only update content for the initial template insertion / teacher overrides.
+            setContent(typeof next.content === 'string' ? next.content : '');
+            setContentText(incomingContentText);
+            templateAppliedRef.current = true;
+          }
+
+          if (typeof next.paste_count === 'number') setPasteCount(next.paste_count);
+          if (typeof next.stagnant_count === 'number') setStagnantCount(next.stagnant_count);
+          if (typeof next.tabbed_out_count === 'number') setTabbedOutCount(next.tabbed_out_count);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [documentId]);
 
   useEffect(() => {
     let mounted = true;
@@ -453,6 +503,17 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     }
   };
 
+  const toggleTodoCompleted = async (id: string) => {
+    const next = todoList.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t));
+    setTodoList(next);
+
+    const { error } = await supabase.from('documents').update({ todo_list_json: next }).eq('id', documentId);
+    if (error) {
+      console.error('Error updating todo completion:', error);
+      alert('Failed to update to-do completion.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
       <div className="max-w-6xl mx-auto">
@@ -492,15 +553,39 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
             </div>
           </div>
 
-          {assignmentInstructionsHtml ? (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-800">
-              <div className="font-semibold text-gray-900 mb-1">Assignment instructions</div>
-              <div dangerouslySetInnerHTML={{ __html: assignmentInstructionsHtml }} />
+          {(assignmentInstructionsHtml || todoList.length > 0) ? (
+            <div className="mb-4 flex flex-col lg:flex-row gap-4 max-w-[816px] mx-auto">
+              {assignmentInstructionsHtml ? (
+                <div className="flex-1 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-800">
+                  <div className="font-semibold text-gray-900 mb-1">Assignment instructions</div>
+                  <div dangerouslySetInnerHTML={{ __html: assignmentInstructionsHtml }} />
+                </div>
+              ) : null}
+
+              {todoList.length > 0 ? (
+                <div className="w-full lg:w-80 p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="font-semibold text-gray-900 mb-2">To-do</div>
+                  <div className="space-y-2">
+                    {todoList.map((t) => (
+                      <label key={t.id} className="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={t.completed}
+                          onChange={() => toggleTodoCompleted(t.id)}
+                          className="mt-0.5"
+                        />
+                        <span className={t.completed ? 'line-through text-gray-500' : ''}>{t.text}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
         <div className="flex gap-4 flex-col lg:flex-row">
           <div className="flex-1 min-w-0">
+            <div className="max-w-[816px] mx-auto">
             <div className="sticky top-0 z-10 bg-white">
               <div className="flex flex-wrap items-center gap-2 border border-gray-200 rounded-lg p-2 mb-3">
                 <select
@@ -579,21 +664,22 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
               </div>
             </div>
 
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              spellCheck
-              onInput={handleEditorInput}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent overflow-auto"
-              style={{ fontFamily: fontCssFamily }}
-              data-placeholder="Start writing your work here..."
-            />
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck
+                onInput={handleEditorInput}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                className="lockd-editor-area w-full min-h-[600px] p-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent overflow-auto bg-white"
+                style={{ fontFamily: fontCssFamily }}
+                data-placeholder="Start writing your work here..."
+              />
 
             <div className="mt-2 text-sm text-gray-500">
               Last activity: {new Date(lastInput).toLocaleTimeString()}
+            </div>
             </div>
           </div>
 

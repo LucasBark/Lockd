@@ -12,6 +12,8 @@ type SuggestionRow = {
   created_at: string;
 };
 
+type TodoItem = { id: string; text: string; completed: boolean };
+
 export function TeacherDocModal({
   documentId,
   studentName,
@@ -26,6 +28,7 @@ export function TeacherDocModal({
   const [contentText, setContentText] = useState('');
   const [pasteCount, setPasteCount] = useState(0);
   const [stagnantCount, setStagnantCount] = useState(0);
+  const [todoList, setTodoList] = useState<TodoItem[]>([]);
   const [assignmentInstructionsText, setAssignmentInstructionsText] = useState('');
   const [assignmentInstructionsHtml, setAssignmentInstructionsHtml] = useState('');
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
@@ -36,6 +39,7 @@ export function TeacherDocModal({
 
   const [suggestionText, setSuggestionText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [todoEditorText, setTodoEditorText] = useState('');
 
   const context = useMemo(() => {
     if (selectionStart == null || selectionEnd == null) return '';
@@ -52,7 +56,7 @@ export function TeacherDocModal({
       supabase
         .from('documents')
         .select(
-          'content,content_text,paste_count,stagnant_count,assignment_instructions_text,assignment_instructions_html'
+          'content,content_text,paste_count,stagnant_count,assignment_instructions_text,assignment_instructions_html,todo_list_json'
         )
         .eq('id', documentId)
         .maybeSingle(),
@@ -74,6 +78,13 @@ export function TeacherDocModal({
           setStagnantCount(typeof docRes.data.stagnant_count === 'number' ? docRes.data.stagnant_count : 0);
           setAssignmentInstructionsText(docRes.data.assignment_instructions_text ?? '');
           setAssignmentInstructionsHtml(docRes.data.assignment_instructions_html ?? '');
+          setTodoList((docRes.data.todo_list_json as TodoItem[]) ?? []);
+          setTodoEditorText(
+            ((docRes.data.todo_list_json as TodoItem[]) ?? [])
+              .map((t) => t.text)
+              .filter((t) => typeof t === 'string' && t.trim().length > 0)
+              .join('\n')
+          );
         }
         if (sugRes.data) setSuggestions(sugRes.data as SuggestionRow[]);
       })
@@ -92,6 +103,7 @@ export function TeacherDocModal({
             content_text?: string;
             paste_count?: number;
             stagnant_count?: number;
+            todo_list_json?: TodoItem[];
             assignment_instructions_text?: string;
             assignment_instructions_html?: string;
           };
@@ -99,6 +111,7 @@ export function TeacherDocModal({
           if (typeof next.content_text === 'string') setContentText(next.content_text);
           if (typeof next.paste_count === 'number') setPasteCount(next.paste_count);
           if (typeof next.stagnant_count === 'number') setStagnantCount(next.stagnant_count);
+          if (Array.isArray(next.todo_list_json)) setTodoList(next.todo_list_json as TodoItem[]);
           if (typeof next.assignment_instructions_text === 'string') setAssignmentInstructionsText(next.assignment_instructions_text);
           if (typeof next.assignment_instructions_html === 'string') setAssignmentInstructionsHtml(next.assignment_instructions_html);
         }
@@ -186,6 +199,27 @@ export function TeacherDocModal({
     }
   };
 
+  const setTodoForStudent = async () => {
+    const lines = (todoEditorText ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const next = lines.map((t, idx) => ({
+      id: String(idx),
+      text: t,
+      completed: false,
+    }));
+
+    const { error } = await supabase.from('documents').update({ todo_list_json: next }).eq('id', documentId);
+    if (error) {
+      console.error('Error setting todo list:', error);
+      alert('Failed to set to-do list.');
+      return;
+    }
+    setTodoList(next);
+  };
+
   const toHtmlFromPlain = (text: string) => {
     const safe = (text ?? '')
       .replaceAll('&', '&amp;')
@@ -210,50 +244,6 @@ export function TeacherDocModal({
     }
   };
 
-  const [isImportingDocx, setIsImportingDocx] = useState(false);
-
-  const importDocxTemplate = async (file: File) => {
-    setIsImportingDocx(true);
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      // Lazy-load so student routes aren't affected if DOCX features aren't used.
-      const mammothModule: any = await import('mammoth');
-      const converter = mammothModule?.convertToHtml ?? mammothModule?.default?.convertToHtml;
-      if (!converter) throw new Error('mammoth.convertToHtml not available');
-      const result = await converter({ arrayBuffer });
-      const html = result.value ?? '';
-      const tmp = document.createElement('div');
-      tmp.innerHTML = html;
-      const plain = tmp.innerText ?? '';
-
-      const shouldApplyToContent = !contentText.trim();
-      const updatePayload: Record<string, unknown> = {
-        assignment_template_html: html,
-        assignment_template_text: plain,
-      };
-      if (shouldApplyToContent) {
-        updatePayload.content = html;
-        updatePayload.content_text = plain;
-        updatePayload.last_activity = new Date().toISOString();
-        updatePayload.updated_at = new Date().toISOString();
-      }
-
-      const { error } = await supabase.from('documents').update(updatePayload).eq('id', documentId);
-      if (error) throw error;
-      if (shouldApplyToContent) {
-        setContentHtml(html);
-        setContentText(plain);
-      }
-
-      alert(shouldApplyToContent ? 'Template imported and inserted into the student doc.' : 'Template imported (student doc not overwritten).');
-    } catch (err) {
-      console.error('Docx import error:', err);
-      alert('Failed to import DOCX template.');
-    } finally {
-      setIsImportingDocx(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden">
@@ -266,14 +256,23 @@ export function TeacherDocModal({
               Stagnant: <span className="font-mono font-semibold">{stagnantCount}</span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5 text-gray-700" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 text-sm font-medium"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-gray-100"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
@@ -330,23 +329,8 @@ export function TeacherDocModal({
 
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">
-                  Import DOCX template (applies to students if their doc is empty)
+                  Template import is handled in the dashboard before students join.
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    accept=".docx"
-                    className="text-sm"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) importDocxTemplate(f);
-                    }}
-                    disabled={isImportingDocx}
-                  />
-                  <div className="text-xs text-gray-500">
-                    {isImportingDocx ? 'Importing…' : 'Choose .docx file'}
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -417,6 +401,44 @@ export function TeacherDocModal({
                 )}
               </div>
             )}
+            <div className="mt-6">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="text-sm font-medium text-gray-700">Student to-do progress</div>
+                <div className="text-xs text-gray-500">
+                  {todoList.filter((t) => t.completed).length}/{todoList.length} done
+                </div>
+              </div>
+
+              {todoList.length === 0 ? (
+                <div className="text-sm text-gray-500 mb-4">No to-do items yet.</div>
+              ) : (
+                <div className="space-y-2 mb-4">
+                  {todoList.map((t) => (
+                    <label key={t.id} className="flex items-start gap-2 text-sm text-gray-800">
+                      <input type="checkbox" checked={t.completed} readOnly className="mt-0.5" />
+                      <span className={t.completed ? 'line-through text-gray-500' : ''}>{t.text}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div className="text-xs font-medium text-gray-600 mb-1">Override to-do for this student</div>
+              <textarea
+                value={todoEditorText}
+                onChange={(e) => setTodoEditorText(e.target.value)}
+                className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="One task per line"
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={setTodoForStudent}
+                  className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+                >
+                  Set to-do for this student
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
