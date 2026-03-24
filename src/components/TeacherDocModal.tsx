@@ -245,42 +245,28 @@ export function TeacherDocModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div>
-            <div className="text-lg font-semibold text-gray-900">Student doc: {studentName}</div>
-            <div className="text-sm text-gray-600">
+            <div className="text-lg font-semibold text-slate-900">Student doc: {studentName}</div>
+            <div className="text-sm text-slate-600">
               Pastes: <span className="font-mono font-semibold">{pasteCount}</span>
-              <span className="mx-2 text-gray-300">•</span>
+              <span className="mx-2 text-slate-300">•</span>
               Stagnant: <span className="font-mono font-semibold">{stagnantCount}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 text-sm font-medium"
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-100"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5 text-gray-700" />
-            </button>
-          </div>
+          <button type="button" onClick={onClose} className="rounded-xl p-2 transition hover:bg-slate-100" aria-label="Close">
+            <X className="h-5 w-5 text-slate-700" />
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-          <div className="p-5 border-b lg:border-b-0 lg:border-r">
-            <div className="text-sm font-medium text-gray-700 mb-2">Preview (select text to anchor a suggestion)</div>
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-2">
+          <div className="border-b border-slate-200 p-6 lg:border-b-0 lg:border-r">
+            <div className="mb-2 text-sm font-medium text-slate-700">Preview (select text to anchor a suggestion)</div>
             {assignmentInstructionsHtml ? (
-              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-800">
-                <div className="font-semibold text-gray-900 mb-1">Assignment instructions</div>
+              <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50/80 p-3 text-sm text-slate-800">
+                <div className="mb-1 font-semibold text-slate-900">Assignment instructions</div>
                 <div dangerouslySetInnerHTML={{ __html: assignmentInstructionsHtml }} />
               </div>
             ) : null}
@@ -289,38 +275,38 @@ export function TeacherDocModal({
               readOnly
               onMouseUp={captureSelection}
               onKeyUp={captureSelection}
-              className="w-full h-[420px] p-4 border border-gray-300 rounded-lg bg-gray-50 font-sans text-sm whitespace-pre-wrap"
+              className="h-[420px] w-full whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 font-sans text-sm"
             />
             <div className="mt-3">
-              <div className="text-xs font-medium text-gray-600 mb-1">Rendered preview</div>
+              <div className="mb-1 text-xs font-medium text-slate-600">Rendered preview</div>
               <div
-                className="max-h-40 overflow-auto border border-gray-200 rounded-lg bg-white p-3 text-sm"
+                className="max-h-40 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-sm"
                 dangerouslySetInnerHTML={{ __html: contentHtml || '' }}
               />
             </div>
-            <div className="mt-3 text-xs text-gray-600">
+            <div className="mt-3 text-xs text-slate-600">
               Selected: <span className="font-medium">{selectedText ? `"${selectedText.slice(0, 80)}${selectedText.length > 80 ? '…' : ''}"` : '—'}</span>
             </div>
           </div>
 
-          <div className="p-5">
+          <div className="p-6">
             <div className="mb-5">
-              <div className="text-sm font-medium text-gray-700 mb-2">Assignment</div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Assignment</div>
 
               <div className="mb-3">
-                <label className="text-xs font-medium text-gray-600 block mb-1">
+                <label className="mb-1 block text-xs font-medium text-slate-600">
                   Instructions (shown above the doc)
                 </label>
                 <textarea
                   value={assignmentInstructionsText}
                   onChange={(e) => setAssignmentInstructionsText(e.target.value)}
-                  className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="textarea-base h-24"
                 />
                 <div className="flex items-center justify-end mt-2">
                   <button
                     type="button"
                     onClick={saveInstructions}
-                    className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+                    className="btn-primary"
                   >
                     Save instructions
                   </button>
@@ -328,15 +314,15 @@ export function TeacherDocModal({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
+                <label className="mb-1 block text-xs font-medium text-slate-500">
                   Template import is handled in the dashboard before students join.
                 </label>
               </div>
             </div>
 
             <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="text-sm font-medium text-gray-700">Suggestions</div>
-              <div className="text-xs text-gray-500">{suggestions.length} total</div>
+              <div className="text-sm font-medium text-slate-700">Suggestions</div>
+              <div className="text-xs text-slate-500">{suggestions.length} total</div>
             </div>
 
             <div className="flex gap-2">
@@ -344,13 +330,13 @@ export function TeacherDocModal({
                 value={suggestionText}
                 onChange={(e) => setSuggestionText(e.target.value)}
                 placeholder="Write a suggestion…"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="input-base flex-1"
               />
               <button
                 type="button"
                 onClick={submitSuggestion}
                 disabled={isSubmitting || !suggestionText.trim()}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="btn-primary"
               >
                 <MessageSquarePlus className="w-4 h-4" />
                 Add
@@ -358,38 +344,38 @@ export function TeacherDocModal({
             </div>
 
             {isLoading ? (
-              <div className="mt-4 text-sm text-gray-500">Loading…</div>
+              <div className="mt-4 text-sm text-slate-500">Loading…</div>
             ) : (
               <div className="mt-4 space-y-3 max-h-[380px] overflow-auto pr-1">
                 {suggestions.length === 0 ? (
-                  <div className="text-sm text-gray-500">No suggestions yet.</div>
+                  <div className="text-sm text-slate-500">No suggestions yet.</div>
                 ) : (
                   suggestions.map((s) => (
                     <div
                       key={s.id}
-                      className={`border rounded-lg p-3 ${s.resolved ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}
+                      className={`rounded-xl border p-3 ${s.resolved ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-white'}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           {s.selected_text ? (
-                            <div className="text-xs text-gray-600 mb-1 truncate">
+                            <div className="mb-1 truncate text-xs text-slate-600">
                               On: <span className="font-medium">"{s.selected_text}"</span>
                             </div>
                           ) : (
-                            <div className="text-xs text-gray-400 mb-1">No selection</div>
+                            <div className="mb-1 text-xs text-slate-400">No selection</div>
                           )}
-                          <div className="text-sm text-gray-900">{s.suggestion}</div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-sm text-slate-900">{s.suggestion}</div>
+                          <div className="mt-1 text-xs text-slate-500">
                             {new Date(s.created_at).toLocaleString()}
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => toggleResolved(s.id, !s.resolved)}
-                          className={`shrink-0 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium ${
+                          className={`shrink-0 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
                             s.resolved
                               ? 'bg-green-600 text-white hover:bg-green-700'
-                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                              : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
                           }`}
                         >
                           <CheckCircle2 className="w-4 h-4" />
@@ -403,37 +389,37 @@ export function TeacherDocModal({
             )}
             <div className="mt-6">
               <div className="flex items-center justify-between gap-3 mb-2">
-                <div className="text-sm font-medium text-gray-700">Student to-do progress</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-sm font-medium text-slate-700">Student to-do progress</div>
+                <div className="text-xs text-slate-500">
                   {todoList.filter((t) => t.completed).length}/{todoList.length} done
                 </div>
               </div>
 
               {todoList.length === 0 ? (
-                <div className="text-sm text-gray-500 mb-4">No to-do items yet.</div>
+                <div className="mb-4 text-sm text-slate-500">No to-do items yet.</div>
               ) : (
                 <div className="space-y-2 mb-4">
                   {todoList.map((t) => (
-                    <label key={t.id} className="flex items-start gap-2 text-sm text-gray-800">
+                    <label key={t.id} className="flex items-start gap-2 text-sm text-slate-800">
                       <input type="checkbox" checked={t.completed} readOnly className="mt-0.5" />
-                      <span className={t.completed ? 'line-through text-gray-500' : ''}>{t.text}</span>
+                      <span className={t.completed ? 'text-slate-500 line-through' : ''}>{t.text}</span>
                     </label>
                   ))}
                 </div>
               )}
 
-              <div className="text-xs font-medium text-gray-600 mb-1">Override to-do for this student</div>
+              <div className="mb-1 text-xs font-medium text-slate-600">Override to-do for this student</div>
               <textarea
                 value={todoEditorText}
                 onChange={(e) => setTodoEditorText(e.target.value)}
-                className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="textarea-base h-24"
                 placeholder="One task per line"
               />
               <div className="flex justify-end mt-2">
                 <button
                   type="button"
                   onClick={setTodoForStudent}
-                  className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+                  className="btn-primary"
                 >
                   Set to-do for this student
                 </button>

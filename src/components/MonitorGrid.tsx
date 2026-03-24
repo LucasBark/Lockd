@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Monitor, User, Activity, FileText, Download } from 'lucide-react';
+import { Monitor, User, Activity, FileText, Download, UploadCloud } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePeerConnection, StudentHeartbeat } from '../hooks/usePeerConnection';
 import { TeacherDocModal } from './TeacherDocModal';
@@ -29,6 +29,8 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [sessionTodoText, setSessionTodoText] = useState<string>('');
   const [isSettingInstructions, setIsSettingInstructions] = useState(false);
   const [isSettingTodo, setIsSettingTodo] = useState(false);
+  const [isDragOverTemplate, setIsDragOverTemplate] = useState(false);
+  const templateInputRef = useRef<HTMLInputElement | null>(null);
 
   const cleanupDoneRef = useRef(false);
 
@@ -490,130 +492,159 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between">
+    <div className="app-shell">
+      <div className="app-container">
+        <div className="app-card mb-6 p-5 md:p-6">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-center gap-3">
-              <Monitor className="w-8 h-8 text-blue-600" />
+              <div className="rounded-xl bg-blue-50 p-2.5">
+                <Monitor className="h-7 w-7 text-blue-600" />
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">{sessionTitle || 'Class'}</h1>
-                <p className="text-gray-600">Session Code: <span className="font-mono font-bold text-blue-600">{sessionCode}</span></p>
+                <h1 className="text-2xl font-semibold text-slate-900 md:text-3xl">{sessionTitle || 'Class'}</h1>
+                <p className="text-sm text-slate-600 md:text-base">
+                  Session Code: <span className="font-mono font-bold text-blue-600">{sessionCode}</span>
+                </p>
               </div>
             </div>
-            <div className="text-right">
+
+            <div className="w-full max-w-[460px]">
+              <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
                 {sessionIsActive ? (
                   <button
                     type="button"
                     onClick={endClass}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+                    className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
                   >
                     End class
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={exportCsv}
-                  disabled={sessionIsActive}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
-                  title={sessionIsActive ? 'End class to export CSV' : 'Download class CSV'}
-                >
+                <button type="button" onClick={exportCsv} disabled={sessionIsActive} className="btn-primary" title={sessionIsActive ? 'End class to export CSV' : 'Download class CSV'}>
                   <Download className="w-4 h-4" />
                   Export CSV
                 </button>
-                <div className="text-xs text-gray-500 mt-1">
-                  {sessionIsActive ? 'End the class to unlock CSV export' : 'CSV export unlocked'}
-                </div>
+              </div>
 
-                {!sessionIsActive && sessionEndedAt && cleanupCountdownMs !== null ? (
-                  <div className="text-xs text-gray-500 mt-2">
-                    Session data will be deleted in{' '}
-                    <span className="font-mono font-semibold">
-                      {Math.floor(cleanupCountdownMs / 60000)}m:{String(Math.floor((cleanupCountdownMs % 60000) / 1000)).padStart(2, '0')}s
-                    </span>
-                  </div>
-                ) : null}
-
-                <div className="mt-4 text-left max-w-[420px]">
-                  <div className="text-xs font-medium text-gray-600 mb-2">
-                    Assignment template (DOCX) — applies to students when they join
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      accept=".docx"
-                      disabled={isSettingTemplate}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleSetTemplate(f);
-                      }}
-                      className="text-sm"
-                    />
-                    <div className="text-xs text-gray-500">
-                      {isSettingTemplate ? 'Importing…' : sessionHasTemplate ? 'Template set' : 'No template yet'}
-                    </div>
-                  </div>
+              <div className="text-xs text-slate-500">
+                {sessionIsActive ? 'End the class to unlock CSV export' : 'CSV export unlocked'}
+              </div>
+              {!sessionIsActive && sessionEndedAt && cleanupCountdownMs !== null ? (
+                <div className="mt-2 text-xs text-slate-500">
+                  Session data will be deleted in{' '}
+                  <span className="font-mono font-semibold">
+                    {Math.floor(cleanupCountdownMs / 60000)}m:{String(Math.floor((cleanupCountdownMs % 60000) / 1000)).padStart(2, '0')}s
+                  </span>
                 </div>
+              ) : null}
 
-                <div className="mt-4 text-left max-w-[420px]">
-                  <div className="text-xs font-medium text-gray-600 mb-2">Assignment instructions (plain text)</div>
-                  <textarea
-                    value={sessionInstructionsText}
-                    onChange={(e) => setSessionInstructionsText(e.target.value)}
-                    className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter instructions. Use new lines for paragraphs."
-                    disabled={isSettingInstructions}
-                  />
-                  <div className="flex items-center justify-end mt-2">
-                    <button
-                      type="button"
-                      onClick={handleSetInstructions}
-                      disabled={isSettingInstructions}
-                      className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:bg-gray-300 disabled:text-gray-500"
-                    >
-                      {isSettingInstructions ? 'Saving…' : 'Set instructions'}
-                    </button>
-                  </div>
+              <div className="mt-4 text-left">
+                <div className="mb-2 text-xs font-medium text-slate-600">
+                  Assignment template (DOCX) — applies to students when they join
                 </div>
+                <input
+                  ref={templateInputRef}
+                  type="file"
+                  accept=".docx"
+                  disabled={isSettingTemplate}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleSetTemplate(f);
+                  }}
+                  className="hidden"
+                />
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (!isSettingTemplate) templateInputRef.current?.click();
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isSettingTemplate) {
+                      e.preventDefault();
+                      templateInputRef.current?.click();
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (!isSettingTemplate) setIsDragOverTemplate(true);
+                  }}
+                  onDragLeave={() => setIsDragOverTemplate(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOverTemplate(false);
+                    if (isSettingTemplate) return;
+                    const file = e.dataTransfer.files?.[0];
+                    if (!file) return;
+                    if (!file.name.toLowerCase().endsWith('.docx')) {
+                      alert('Please upload a .docx file.');
+                      return;
+                    }
+                    handleSetTemplate(file);
+                  }}
+                  className={`rounded-2xl border-2 border-dashed p-4 text-center transition ${
+                    isDragOverTemplate
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+                  } ${isSettingTemplate ? 'cursor-wait opacity-70' : 'cursor-pointer'}`}
+                >
+                  <UploadCloud className="mx-auto mb-2 h-5 w-5 text-slate-500" />
+                  <div className="text-sm font-medium text-slate-700">
+                    {isSettingTemplate ? 'Importing template...' : 'Drag and drop DOCX here'}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">or click to browse files</div>
+                </div>
+                <div className="mt-2 text-xs text-slate-500">{sessionHasTemplate ? 'Template set' : 'No template yet'}</div>
+              </div>
 
-                <div className="mt-4 text-left max-w-[420px]">
-                  <div className="text-xs font-medium text-gray-600 mb-2">Class to-do list (one task per line)</div>
-                  <textarea
-                    value={sessionTodoText}
-                    onChange={(e) => setSessionTodoText(e.target.value)}
-                    className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., Write your thesis (one task per line)"
-                    disabled={isSettingTodo}
-                  />
-                  <div className="flex items-center justify-end mt-2">
-                    <button
-                      type="button"
-                      onClick={handleSetTodo}
-                      disabled={isSettingTodo}
-                      className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:bg-gray-300 disabled:text-gray-500"
-                    >
-                      {isSettingTodo ? 'Saving…' : 'Set to-do'}
-                    </button>
-                  </div>
+              <div className="mt-4 text-left">
+                <div className="mb-2 text-xs font-medium text-slate-600">Assignment instructions (plain text)</div>
+                <textarea
+                  value={sessionInstructionsText}
+                  onChange={(e) => setSessionInstructionsText(e.target.value)}
+                  className="textarea-base h-24"
+                  placeholder="Enter instructions. Use new lines for paragraphs."
+                  disabled={isSettingInstructions}
+                />
+                <div className="mt-2 flex items-center justify-end">
+                  <button type="button" onClick={handleSetInstructions} disabled={isSettingInstructions} className="btn-primary">
+                    {isSettingInstructions ? 'Saving...' : 'Set instructions'}
+                  </button>
                 </div>
+              </div>
+
+              <div className="mt-4 text-left">
+                <div className="mb-2 text-xs font-medium text-slate-600">Class to-do list (one task per line)</div>
+                <textarea
+                  value={sessionTodoText}
+                  onChange={(e) => setSessionTodoText(e.target.value)}
+                  className="textarea-base h-24"
+                  placeholder="e.g., Write your thesis (one task per line)"
+                  disabled={isSettingTodo}
+                />
+                <div className="mt-2 flex items-center justify-end">
+                  <button type="button" onClick={handleSetTodo} disabled={isSettingTodo} className="btn-primary">
+                    {isSettingTodo ? 'Saving...' : 'Set to-do'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from(students.values()).map((student) => {
             const isPulsing = student.isTabActive && student.isWindowFocused && (Date.now() - student.lastInput < 60000);
 
             return (
               <div
                 key={student.studentId}
-                className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-gray-200 hover:shadow-lg transition-shadow"
+                className="app-card overflow-hidden border hover:shadow-md transition-shadow"
               >
-                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                <div className="border-b border-slate-200 bg-slate-50/80 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <User className="w-5 h-5 text-blue-600" />
-                      <h3 className="font-semibold text-gray-800">{student.studentName}</h3>
+                      <h3 className="font-semibold text-slate-800">{student.studentName}</h3>
                     </div>
                     <div className="relative">
                       <div
@@ -624,7 +655,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                     </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
+                    <span className={`rounded-full px-2 py-1 text-xs ${
                       student.isTabActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {getStatusLabel(student)}
@@ -634,20 +665,20 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
 
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <FileText className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">Live Preview</span>
+                    <FileText className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-medium text-slate-700">Live Preview</span>
                   </div>
-                  <div className="bg-gray-50 rounded p-3 min-h-24 max-h-32 overflow-auto">
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                  <div className="min-h-24 max-h-32 overflow-auto rounded-xl bg-slate-50 p-3">
+                    <p className="whitespace-pre-wrap text-sm text-slate-600">
                       {student.snippet || 'No content yet...'}
                     </p>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-slate-600">
                         Pastes: <span className="font-mono font-semibold">{student.pasteCount}</span>
                       </div>
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-slate-600">
                         Stagnant: <span className="font-mono font-semibold">{student.stagnantCount}</span>
                       </div>
                     </div>
@@ -655,12 +686,12 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                       type="button"
                       onClick={() => setOpenDoc({ documentId: student.documentId, studentName: student.studentName })}
                       disabled={!student.documentId}
-                      className="text-xs px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      className="btn-primary px-3 py-1"
                     >
                       Open doc
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
+                  <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                     <Activity className="w-3 h-3" />
                     <span>
                       Last input: {Math.floor((Date.now() - student.lastInput) / 1000)}s ago
@@ -681,10 +712,10 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         )}
 
         {students.size === 0 && (
-          <div className="text-center py-12">
-            <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 text-lg">No students have joined yet</p>
-            <p className="text-gray-500 text-sm">Share the session code with your students</p>
+          <div className="app-card py-12 text-center">
+            <User className="mx-auto mb-4 h-16 w-16 text-slate-400" />
+            <p className="text-lg text-slate-700">No students have joined yet</p>
+            <p className="text-sm text-slate-500">Share the session code with your students</p>
           </div>
         )}
       </div>
