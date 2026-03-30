@@ -77,12 +77,8 @@ export function Landing() {
         </div>
 
         <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={() => navigate('/auth')}
-            className="text-sm font-medium text-stone-700 hover:text-stone-900"
-          >
-            Already have an account? Sign in
+          <button type="button" onClick={() => navigate('/auth')} className="text-sm font-medium text-stone-700 hover:text-stone-900">
+            Teachers: sign in
           </button>
         </div>
       </div>

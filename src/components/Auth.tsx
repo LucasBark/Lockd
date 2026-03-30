@@ -11,7 +11,6 @@ export function Auth() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [role, setRole] = useState<UserRole>('student');
   const [fullName, setFullName] = useState('');
   const [teacherCode, setTeacherCode] = useState('');
   const navigate = useNavigate();
@@ -23,10 +22,22 @@ export function Auth() {
     const mode = params.get('mode');
     if (mode === 'signup') setIsSignUp(true);
     if (mode === 'signin') setIsSignUp(false);
-
-    const roleParam = params.get('role');
-    if (roleParam === 'teacher' || roleParam === 'student') setRole(roleParam);
   }, [params]);
+
+  // Teacher-only auth page. Students join via guest mode at /student/join.
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+      const meta = (data.user?.user_metadata ?? {}) as { role?: UserRole };
+      if (meta.role === 'student') {
+        navigate('/student/join', { replace: true });
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
 
   const routeByRole = async () => {
     const { data, error } = await supabase.auth.getUser();
@@ -51,7 +62,7 @@ export function Auth() {
           alert('Please enter your name.');
           return;
         }
-        if (role === 'teacher' && teacherCode !== TEACHER_PASSWORD) {
+        if (teacherCode !== TEACHER_PASSWORD) {
           alert('Invalid teacher verification code.');
           return;
         }
@@ -60,7 +71,7 @@ export function Auth() {
           password,
           options: {
             data: {
-              role,
+              role: 'teacher',
               full_name: fullName.trim(),
             },
           },
@@ -124,49 +135,19 @@ export function Auth() {
               </div>
 
               <div className="mb-4">
-                <div className="block text-sm font-medium text-gray-700 mb-2">Account type</div>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setRole('student')}
-                    className={`flex-1 px-4 py-3 rounded-lg border text-sm font-medium ${
-                      role === 'student'
-                        ? 'border-green-500 bg-green-50 text-green-800'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Student
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('teacher')}
-                    className={`flex-1 px-4 py-3 rounded-lg border text-sm font-medium ${
-                      role === 'teacher'
-                        ? 'border-blue-500 bg-blue-50 text-blue-800'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Teacher
-                  </button>
-                </div>
+                <label htmlFor="teacherCode" className="block text-sm font-medium text-gray-700 mb-2">
+                  Teacher verification code
+                </label>
+                <input
+                  type="password"
+                  id="teacherCode"
+                  value={teacherCode}
+                  onChange={(e) => setTeacherCode(e.target.value)}
+                  placeholder="Enter teacher code"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
               </div>
-
-              {role === 'teacher' && (
-                <div className="mb-4">
-                  <label htmlFor="teacherCode" className="block text-sm font-medium text-gray-700 mb-2">
-                    Teacher verification code
-                  </label>
-                  <input
-                    type="password"
-                    id="teacherCode"
-                    value={teacherCode}
-                    onChange={(e) => setTeacherCode(e.target.value)}
-                    placeholder="Enter teacher code"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-              )}
             </>
           )}
 
