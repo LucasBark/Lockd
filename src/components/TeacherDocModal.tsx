@@ -222,10 +222,10 @@ export function TeacherDocModal({
 
   const toHtmlFromPlain = (text: string) => {
     const safe = (text ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;');
-    return safe.replaceAll('\n', '<br/>');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return safe.replace(/\n/g, '<br/>');
   };
 
   const saveInstructions = async () => {

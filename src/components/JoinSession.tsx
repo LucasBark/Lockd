@@ -1,38 +1,85 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Users, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
-interface JoinSessionProps {
-  userId: string;
-}
+type StudentMeta = { full_name?: string; role?: 'teacher' | 'student' };
 
-export function JoinSession({ userId }: JoinSessionProps) {
+export function JoinSession() {
   const [code, setCode] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const navigate = useNavigate();
+
+  const fullName = useMemo(() => {
+    const f = firstName.trim();
+    const l = lastName.trim();
+    return [f, l].filter(Boolean).join(' ');
+  }, [firstName, lastName]);
 
   useEffect(() => {
     let mounted = true;
     supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return;
       if (error) return;
-      const meta = (data.user?.user_metadata ?? {}) as { full_name?: string };
-      if (meta.full_name && !name) setName(meta.full_name);
+      const meta = (data.user?.user_metadata ?? {}) as StudentMeta;
+      const existing = (meta.full_name ?? '').trim();
+      if (!existing) return;
+      const parts = existing.split(/\s+/).filter(Boolean);
+      if (parts.length === 1) {
+        if (!firstName) setFirstName(parts[0]);
+        return;
+      }
+      if (!firstName) setFirstName(parts[0]);
+      if (!lastName) setLastName(parts.slice(1).join(' '));
     });
     return () => {
       mounted = false;
     };
-  }, [name]);
+  }, [firstName, lastName]);
+
+  const ensureStudentSession = async (desiredFullName: string) => {
+    // If the user isn't signed in, create an anonymous session (no email required).
+    const { data: sessionRes } = await supabase.auth.getSession();
+    if (!sessionRes.session) {
+      // Requires Supabase "Anonymous sign-ins" enabled for the project.
+      const { error } = await supabase.auth.signInAnonymously();
+      if (error) throw error;
+    }
+
+    // Ensure we have role + name metadata so routing works and the editor header is correct.
+    const desired = desiredFullName.trim();
+    if (desired) {
+      await supabase.auth.updateUser({
+        data: {
+          role: 'student',
+          full_name: desired,
+        },
+      });
+    } else {
+      await supabase.auth.updateUser({
+        data: {
+          role: 'student',
+        },
+      });
+    }
+
+    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw userErr;
+    const uid = userRes.user?.id ?? '';
+    if (!uid) throw new Error('Unable to start guest session');
+    return uid;
+  };
 
   const handleJoinSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || !name.trim()) return;
+    if (!code.trim() || !firstName.trim() || !lastName.trim()) return;
 
     setIsJoining(true);
 
     try {
+      const userId = await ensureStudentSession(fullName);
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select(
@@ -70,7 +117,7 @@ export function JoinSession({ userId }: JoinSessionProps) {
         .insert({
           session_id: sessionData.id,
           student_id: userId,
-          student_name: name.trim(),
+          student_name: fullName.trim(),
           content: '',
           content_text: '',
           assignment_template_html: sessionData.assignment_template_html ?? '',
@@ -99,35 +146,53 @@ export function JoinSession({ userId }: JoinSessionProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-green-600" />
+    <div className="app-shell flex items-center justify-center">
+      <div className="app-card w-full max-w-md p-8">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-50">
+            <Users className="h-7 w-7 text-emerald-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Join Session</h1>
-          <p className="text-gray-600">Enter your session code to begin</p>
+          <h1 className="mb-2 text-3xl font-semibold text-slate-900">Join Class</h1>
+          <p className="text-slate-600">Guest mode: no email required</p>
         </div>
 
         <form onSubmit={handleJoinSession}>
-          <div className="mb-4">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Your Name
-            </label>
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              required
-            />
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="firstName" className="mb-2 block text-sm font-medium text-slate-700">
+                First name
+              </label>
+              <input
+                type="text"
+                id="firstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="e.g., Alex"
+                className="input-base"
+                autoComplete="given-name"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="lastName" className="mb-2 block text-sm font-medium text-slate-700">
+                Last name
+              </label>
+              <input
+                type="text"
+                id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="e.g., Johnson"
+                className="input-base"
+                autoComplete="family-name"
+                required
+              />
+            </div>
           </div>
 
           <div className="mb-6">
-            <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-2">
-              Session Code
+            <label htmlFor="code" className="mb-2 block text-sm font-medium text-slate-700">
+              Class code
             </label>
             <input
               type="text"
@@ -135,7 +200,7 @@ export function JoinSession({ userId }: JoinSessionProps) {
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="e.g., ABC123"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-lg text-center"
+              className="input-base font-mono text-lg text-center tracking-widest uppercase"
               maxLength={6}
               required
             />
@@ -143,8 +208,8 @@ export function JoinSession({ userId }: JoinSessionProps) {
 
           <button
             type="submit"
-            disabled={isJoining || !code.trim() || !name.trim()}
-            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            disabled={isJoining || !code.trim() || !firstName.trim() || !lastName.trim()}
+            className="btn-primary w-full py-3"
           >
             {isJoining ? (
               <>
@@ -152,7 +217,7 @@ export function JoinSession({ userId }: JoinSessionProps) {
                 Joining...
               </>
             ) : (
-              'Join Session'
+              'Join class'
             )}
           </button>
         </form>

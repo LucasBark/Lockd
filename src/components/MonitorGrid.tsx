@@ -36,10 +36,10 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
 
   const toHtmlFromPlain = useCallback((text: string) => {
     const safe = (text ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;');
-    return safe.replaceAll('\n', '<br/>');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return safe.replace(/\n/g, '<br/>');
   }, []);
 
   const todoTextToJson = useCallback((text: string) => {
@@ -386,7 +386,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     const headers = ['Student', 'Pastes', 'Times stagnant', 'Tabbed out', 'Student work'];
     const escapeCsvValue = (v: unknown) => {
       const s = String(v ?? '');
-      if (/[,"\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
+      if (/[,"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
       return s;
     };
 

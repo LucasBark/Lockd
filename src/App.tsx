@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { Home } from './components/Home';
@@ -212,9 +212,7 @@ function App() {
         <Route
           path="/student/join"
           element={
-            <RequireAuth>
-              <JoinSession userId={auth.userId} />
-            </RequireAuth>
+            <JoinSession />
           }
         />
         <Route

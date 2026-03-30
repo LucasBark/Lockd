@@ -65,14 +65,14 @@ export function Landing() {
 
           <button
             type="button"
-            onClick={() => navigate('/auth?mode=signup&role=student')}
+            onClick={() => navigate('/student/join')}
             className="rounded-2xl border border-stone-300 bg-white p-8 text-left transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
           >
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100">
               <Users className="h-6 w-6 text-stone-700" />
             </div>
             <h2 className="mb-2 text-2xl font-semibold text-stone-900">Student</h2>
-            <p className="text-stone-600">Join a session and start working</p>
+            <p className="text-stone-600">Join a class with your name (no email)</p>
           </button>
         </div>
 

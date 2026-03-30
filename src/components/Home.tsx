@@ -30,51 +30,47 @@ export function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 flex items-center justify-center p-6">
-      <div className="max-w-4xl w-full">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-800 mb-4">Lockd</h1>
-          <p className="text-xl text-gray-600">Real-time classroom monitoring with AI</p>
+    <div className="app-shell flex items-center justify-center">
+      <div className="w-full max-w-5xl">
+        <div className="mb-10 text-center">
+          <h1 className="mb-3 text-5xl font-semibold text-slate-900">Lockd</h1>
+          <p className="text-lg text-slate-600">Real-time classroom monitoring with AI</p>
         </div>
 
         {lastSession && (
           <div className="mb-6 flex justify-center">
-            <button
-              type="button"
-              onClick={handleRejoin}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-            >
+            <button type="button" onClick={handleRejoin} className="btn-primary">
               <RotateCcw className="w-4 h-4" />
               Rejoin last session
             </button>
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid gap-4 md:grid-cols-2">
           <button
             onClick={() => navigate('/teacher/create')}
-            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-blue-500"
+            className="app-card rounded-2xl border p-8 text-left transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
           >
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <GraduationCap className="w-10 h-10 text-blue-600" />
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
+              <GraduationCap className="h-6 w-6 text-blue-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Teacher</h2>
-            <p className="text-gray-600">Create a session and monitor your students in real-time</p>
-            <div className="mt-4 text-sm text-gray-500">
+            <h2 className="mb-2 text-2xl font-semibold text-slate-900">Teacher</h2>
+            <p className="text-slate-600">Create a session and monitor your students in real-time</p>
+            <div className="mt-4 text-sm text-slate-500">
               Features: AI analysis, focus tracking, live previews
             </div>
           </button>
 
           <button
             onClick={() => navigate('/student/join')}
-            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-green-500"
+            className="app-card rounded-2xl border p-8 text-left transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
           >
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Users className="w-10 h-10 text-green-600" />
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50">
+              <Users className="h-6 w-6 text-emerald-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Student</h2>
-            <p className="text-gray-600">Join a session with your class code and start working</p>
-            <div className="mt-4 text-sm text-gray-500">
+            <h2 className="mb-2 text-2xl font-semibold text-slate-900">Student</h2>
+            <p className="text-slate-600">Join a session with your class code and start working</p>
+            <div className="mt-4 text-sm text-slate-500">
               Features: Auto-save, collaborative writing, instant feedback
             </div>
           </button>

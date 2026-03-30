@@ -37,7 +37,6 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
   const [content, setContent] = useState(''); // stored as HTML
   const [contentText, setContentText] = useState(''); // plain text mirror
   const [assignmentInstructionsHtml, setAssignmentInstructionsHtml] = useState('');
-  const [assignmentInstructionsText, setAssignmentInstructionsText] = useState('');
   const [assignmentTemplateHtml, setAssignmentTemplateHtml] = useState('');
   const [assignmentTemplateText, setAssignmentTemplateText] = useState('');
   const [todoList, setTodoList] = useState<TodoItem[]>([]);
@@ -47,7 +46,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
   const [lastInput, setLastInput] = useState(Date.now());
   const [isTabActive, setIsTabActive] = useState(true);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
-  const saveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const stagnantLatchRef = useRef(false);
   const tabbedOutLatchRef = useRef(false);
@@ -104,7 +103,6 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
           setContent(data.content ?? '');
           setContentText(data.content_text ?? '');
           setAssignmentInstructionsHtml(data.assignment_instructions_html ?? '');
-          setAssignmentInstructionsText(data.assignment_instructions_text ?? '');
           setAssignmentTemplateHtml(data.assignment_template_html ?? '');
           setAssignmentTemplateText(data.assignment_template_text ?? '');
           setTodoList((data.todo_list_json as TodoItem[]) ?? []);
@@ -162,7 +160,6 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
           const next = payload.new as any;
 
           if (typeof next.assignment_instructions_html === 'string') setAssignmentInstructionsHtml(next.assignment_instructions_html);
-          if (typeof next.assignment_instructions_text === 'string') setAssignmentInstructionsText(next.assignment_instructions_text);
           if (typeof next.assignment_template_html === 'string') setAssignmentTemplateHtml(next.assignment_template_html);
           if (typeof next.assignment_template_text === 'string') setAssignmentTemplateText(next.assignment_template_text);
 
@@ -375,23 +372,6 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     });
   }, [documentId]);
 
-  const incrementTabbedOutCount = useCallback(() => {
-    setTabbedOutCount((prev) => {
-      const next = prev + 1;
-      supabase
-        .from('documents')
-        .update({
-          tabbed_out_count: next,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', documentId)
-        .then(({ error }) => {
-          if (error) console.error('Error updating tabbed out count:', error);
-        });
-      return next;
-    });
-  }, [documentId]);
-
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (!isTabActive || !isWindowFocused) {
@@ -515,17 +495,17 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
+    <div className="app-shell">
+      <div className="mx-auto max-w-6xl">
+        <div className="app-card mb-4 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <FileText className="w-6 h-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-800">Lockd Editor</h1>
+              <h1 className="text-2xl font-semibold text-slate-900">Lockd Editor</h1>
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-slate-600">
                 {isConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
@@ -542,7 +522,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
             }`}>
               {isWindowFocused ? 'Window Focused' : 'Window Blurred'}
             </div>
-            <div className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700">
+            <div className="chip text-sm">
               Pastes: {pasteCount}
             </div>
             <div className="px-3 py-1 rounded-full text-sm bg-amber-50 text-amber-800 border border-amber-200">
@@ -677,7 +657,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                 data-placeholder="Start writing your work here..."
               />
 
-            <div className="mt-2 text-sm text-gray-500">
+            <div className="mt-2 text-sm text-slate-500">
               Last activity: {new Date(lastInput).toLocaleTimeString()}
             </div>
             </div>
