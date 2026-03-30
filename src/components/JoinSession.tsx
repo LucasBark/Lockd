@@ -149,17 +149,17 @@ export function JoinSession() {
     <div className="app-shell flex items-center justify-center">
       <div className="app-card w-full max-w-md p-8">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-50">
-            <Users className="h-7 w-7 text-emerald-600" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-stone-100">
+            <Users className="h-7 w-7 text-stone-700" />
           </div>
-          <h1 className="mb-2 text-3xl font-semibold text-slate-900">Join Class</h1>
-          <p className="text-slate-600">Guest mode: no email required</p>
+          <h1 className="mb-2 text-3xl font-semibold text-stone-900">Join Class</h1>
+          <p className="text-stone-600">Guest mode: no email required</p>
         </div>
 
         <form onSubmit={handleJoinSession}>
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="firstName" className="mb-2 block text-sm font-medium text-slate-700">
+              <label htmlFor="firstName" className="mb-2 block text-sm font-medium text-stone-700">
                 First name
               </label>
               <input
@@ -174,7 +174,7 @@ export function JoinSession() {
               />
             </div>
             <div>
-              <label htmlFor="lastName" className="mb-2 block text-sm font-medium text-slate-700">
+              <label htmlFor="lastName" className="mb-2 block text-sm font-medium text-stone-700">
                 Last name
               </label>
               <input
@@ -191,7 +191,7 @@ export function JoinSession() {
           </div>
 
           <div className="mb-6">
-            <label htmlFor="code" className="mb-2 block text-sm font-medium text-slate-700">
+            <label htmlFor="code" className="mb-2 block text-sm font-medium text-stone-700">
               Class code
             </label>
             <input

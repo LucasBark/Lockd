@@ -102,16 +102,16 @@ export function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
-      <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
+    <div className="app-shell flex items-center justify-center">
+      <div className="app-card w-full max-w-md p-8">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <LogIn className="w-8 h-8 text-blue-600" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-stone-100">
+            <LogIn className="h-7 w-7 text-stone-700" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <h1 className="mb-2 text-3xl font-semibold text-stone-900">
             {isSignUp ? 'Create Account' : 'Welcome Back'}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-stone-600">
             {isSignUp ? 'Sign up to get started' : 'Sign in to continue'}
           </p>
         </div>
@@ -120,7 +120,7 @@ export function Auth() {
           {isSignUp && (
             <>
               <div className="mb-4">
-                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-stone-700">
                   Name
                 </label>
                 <input
@@ -129,13 +129,13 @@ export function Auth() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g., Alex Johnson"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="input-base"
                   required
                 />
               </div>
 
               <div className="mb-4">
-                <label htmlFor="teacherCode" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="teacherCode" className="mb-2 block text-sm font-medium text-stone-700">
                   Teacher verification code
                 </label>
                 <input
@@ -144,7 +144,7 @@ export function Auth() {
                   value={teacherCode}
                   onChange={(e) => setTeacherCode(e.target.value)}
                   placeholder="Enter teacher code"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="input-base"
                   required
                 />
               </div>
@@ -152,7 +152,7 @@ export function Auth() {
           )}
 
           <div className="mb-4">
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-stone-700">
               Email
             </label>
             <input
@@ -161,13 +161,13 @@ export function Auth() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="input-base"
               required
             />
           </div>
 
           <div className="mb-6">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-stone-700">
               Password
             </label>
             <input
@@ -176,7 +176,7 @@ export function Auth() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="input-base"
               required
               minLength={6}
             />
@@ -185,7 +185,7 @@ export function Auth() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="btn-primary w-full py-3"
           >
             {isLoading ? (
               <>
@@ -201,7 +201,7 @@ export function Auth() {
         <div className="mt-4 text-center">
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+            className="text-sm font-medium text-stone-700 hover:text-stone-900"
           >
             {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
           </button>

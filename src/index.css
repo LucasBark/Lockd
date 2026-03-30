@@ -5,12 +5,12 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-stone-100 text-stone-900 antialiased;
 }
 
 @layer components {
   .app-shell {
-    @apply min-h-screen bg-slate-50 p-4 md:p-6;
+    @apply min-h-screen bg-stone-100 p-4 md:p-6;
   }
 
   .app-container {
@@ -18,27 +18,27 @@ body {
   }
 
   .app-card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-2xl border border-stone-200 bg-white shadow-sm;
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400;
   }
 
   .input-base {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100;
+    @apply w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200;
   }
 
   .textarea-base {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100;
+    @apply w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200;
   }
 
   .chip {
-    @apply rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700;
+    @apply rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700;
   }
 }
 

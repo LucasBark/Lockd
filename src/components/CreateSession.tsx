@@ -58,16 +58,16 @@ export function CreateSession({ userId }: CreateSessionProps) {
     <div className="app-shell flex items-center justify-center">
       <div className="app-card w-full max-w-md p-8">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">
-            <Plus className="h-7 w-7 text-blue-600" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-stone-100">
+            <Plus className="h-7 w-7 text-stone-700" />
           </div>
-          <h1 className="mb-2 text-3xl font-semibold text-slate-900">Create Session</h1>
-          <p className="text-slate-600">Start monitoring your classroom</p>
+          <h1 className="mb-2 text-3xl font-semibold text-stone-900">Create Session</h1>
+          <p className="text-stone-600">Start monitoring your classroom</p>
         </div>
 
         <form onSubmit={handleCreateSession}>
           <div className="mb-6">
-            <label htmlFor="title" className="mb-2 block text-sm font-medium text-slate-700">
+            <label htmlFor="title" className="mb-2 block text-sm font-medium text-stone-700">
               Session Title
             </label>
             <input

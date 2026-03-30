@@ -245,25 +245,25 @@ export function TeacherDocModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4">
           <div>
-            <div className="text-lg font-semibold text-slate-900">Student doc: {studentName}</div>
-            <div className="text-sm text-slate-600">
+            <div className="text-lg font-semibold text-stone-900">Student doc: {studentName}</div>
+            <div className="text-sm text-stone-600">
               Pastes: <span className="font-mono font-semibold">{pasteCount}</span>
-              <span className="mx-2 text-slate-300">•</span>
+              <span className="mx-2 text-stone-300">•</span>
               Stagnant: <span className="font-mono font-semibold">{stagnantCount}</span>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl p-2 transition hover:bg-slate-100" aria-label="Close">
-            <X className="h-5 w-5 text-slate-700" />
+          <button type="button" onClick={onClose} className="rounded-xl p-2 transition hover:bg-stone-100" aria-label="Close">
+            <X className="h-5 w-5 text-stone-700" />
           </button>
         </div>
 
         <div className="grid grid-cols-1 gap-0 lg:grid-cols-2">
-          <div className="border-b border-slate-200 p-6 lg:border-b-0 lg:border-r">
-            <div className="mb-2 text-sm font-medium text-slate-700">Preview (select text to anchor a suggestion)</div>
+          <div className="border-b border-stone-200 p-6 lg:border-b-0 lg:border-r">
+            <div className="mb-2 text-sm font-medium text-stone-700">Preview (select text to anchor a suggestion)</div>
             {assignmentInstructionsHtml ? (
               <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50/80 p-3 text-sm text-slate-800">
                 <div className="mb-1 font-semibold text-slate-900">Assignment instructions</div>

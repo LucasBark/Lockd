@@ -33,8 +33,8 @@ export function Home() {
     <div className="app-shell flex items-center justify-center">
       <div className="w-full max-w-5xl">
         <div className="mb-10 text-center">
-          <h1 className="mb-3 text-5xl font-semibold text-slate-900">Lockd</h1>
-          <p className="text-lg text-slate-600">Real-time classroom monitoring with AI</p>
+          <h1 className="mb-3 text-5xl font-semibold text-stone-900">Lockd</h1>
+          <p className="text-lg text-stone-600">Real-time classroom monitoring with AI</p>
         </div>
 
         {lastSession && (
@@ -49,28 +49,28 @@ export function Home() {
         <div className="grid gap-4 md:grid-cols-2">
           <button
             onClick={() => navigate('/teacher/create')}
-            className="app-card rounded-2xl border p-8 text-left transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+            className="app-card rounded-2xl border p-8 text-left transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
           >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
-              <GraduationCap className="h-6 w-6 text-blue-600" />
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100">
+              <GraduationCap className="h-6 w-6 text-stone-700" />
             </div>
-            <h2 className="mb-2 text-2xl font-semibold text-slate-900">Teacher</h2>
-            <p className="text-slate-600">Create a session and monitor your students in real-time</p>
-            <div className="mt-4 text-sm text-slate-500">
+            <h2 className="mb-2 text-2xl font-semibold text-stone-900">Teacher</h2>
+            <p className="text-stone-600">Create a session and monitor your students in real-time</p>
+            <div className="mt-4 text-sm text-stone-500">
               Features: AI analysis, focus tracking, live previews
             </div>
           </button>
 
           <button
             onClick={() => navigate('/student/join')}
-            className="app-card rounded-2xl border p-8 text-left transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+            className="app-card rounded-2xl border p-8 text-left transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
           >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50">
-              <Users className="h-6 w-6 text-emerald-600" />
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100">
+              <Users className="h-6 w-6 text-stone-700" />
             </div>
-            <h2 className="mb-2 text-2xl font-semibold text-slate-900">Student</h2>
-            <p className="text-slate-600">Join a session with your class code and start working</p>
-            <div className="mt-4 text-sm text-slate-500">
+            <h2 className="mb-2 text-2xl font-semibold text-stone-900">Student</h2>
+            <p className="text-stone-600">Join a session with your class code and start working</p>
+            <div className="mt-4 text-sm text-stone-500">
               Features: Auto-save, collaborative writing, instant feedback
             </div>
           </button>

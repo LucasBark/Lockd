@@ -500,12 +500,12 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
         <div className="app-card mb-4 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <FileText className="w-6 h-6 text-blue-600" />
-              <h1 className="text-2xl font-semibold text-slate-900">Lockd Editor</h1>
+              <FileText className="w-6 h-6 text-stone-700" />
+              <h1 className="text-2xl font-semibold text-stone-900">Lockd Editor</h1>
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-sm text-slate-600">
+              <span className="text-sm text-stone-600">
                 {isConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
@@ -567,7 +567,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
           <div className="flex-1 min-w-0">
             <div className="max-w-[816px] mx-auto">
             <div className="sticky top-0 z-10 bg-white">
-              <div className="flex flex-wrap items-center gap-2 border border-gray-200 rounded-lg p-2 mb-3">
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 p-2">
                 <select
                   value={fontValue}
                   onChange={(e) => {
@@ -575,7 +575,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                     setFontValue(next);
                     applyCommand('fontName', next);
                   }}
-                  className="px-2 py-1 border border-gray-200 rounded-md text-sm bg-white"
+                  className="rounded-md border border-stone-200 bg-white px-2 py-1 text-sm"
                 >
                   {FONT_OPTIONS.map((f) => (
                     <option key={f.value} value={f.value}>
@@ -584,13 +584,13 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                   ))}
                 </select>
 
-                <div className="h-6 w-px bg-gray-200 mx-1" />
+                <div className="mx-1 h-6 w-px bg-stone-200" />
 
                 <button
                   type="button"
                   onClick={() => applyCommand('bold')}
-                  className={`p-2 rounded-md hover:bg-gray-100 ${
-                    formatActive.bold ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  className={`rounded-md p-2 hover:bg-stone-100 ${
+                    formatActive.bold ? 'bg-stone-200 text-stone-900 hover:bg-stone-300' : ''
                   }`}
                   aria-label="Bold"
                 >
@@ -599,8 +599,8 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                 <button
                   type="button"
                   onClick={() => applyCommand('italic')}
-                  className={`p-2 rounded-md hover:bg-gray-100 ${
-                    formatActive.italic ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  className={`rounded-md p-2 hover:bg-stone-100 ${
+                    formatActive.italic ? 'bg-stone-200 text-stone-900 hover:bg-stone-300' : ''
                   }`}
                   aria-label="Italic"
                 >
@@ -609,8 +609,8 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                 <button
                   type="button"
                   onClick={() => applyCommand('underline')}
-                  className={`p-2 rounded-md hover:bg-gray-100 ${
-                    formatActive.underline ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  className={`rounded-md p-2 hover:bg-stone-100 ${
+                    formatActive.underline ? 'bg-stone-200 text-stone-900 hover:bg-stone-300' : ''
                   }`}
                   aria-label="Underline"
                 >
@@ -619,8 +619,8 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                 <button
                   type="button"
                   onClick={() => applyCommand('hiliteColor', '#fff59d')}
-                  className={`p-2 rounded-md hover:bg-gray-100 ${
-                    formatActive.highlight ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''
+                  className={`rounded-md p-2 hover:bg-stone-100 ${
+                    formatActive.highlight ? 'bg-stone-200 text-stone-900 hover:bg-stone-300' : ''
                   }`}
                   aria-label="Highlight"
                 >
@@ -632,13 +632,13 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                     type="button"
                     onClick={copyText}
                     disabled={!contentText.trim()}
-                    className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                    className="btn-primary px-3 py-1.5"
                   >
                     <Copy className="w-4 h-4" />
                     Copy text
                   </button>
                   {copyStatus ? (
-                    <span className="text-xs text-blue-700 font-medium">{copyStatus}</span>
+                    <span className="text-xs font-medium text-stone-700">{copyStatus}</span>
                   ) : null}
                 </div>
               </div>

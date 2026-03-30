@@ -497,13 +497,13 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         <div className="app-card mb-6 p-5 md:p-6">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-blue-50 p-2.5">
-                <Monitor className="h-7 w-7 text-blue-600" />
+              <div className="rounded-xl bg-stone-100 p-2.5">
+                <Monitor className="h-7 w-7 text-stone-700" />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold text-slate-900 md:text-3xl">{sessionTitle || 'Class'}</h1>
-                <p className="text-sm text-slate-600 md:text-base">
-                  Session Code: <span className="font-mono font-bold text-blue-600">{sessionCode}</span>
+                <h1 className="text-2xl font-semibold text-stone-900 md:text-3xl">{sessionTitle || 'Class'}</h1>
+                <p className="text-sm text-stone-600 md:text-base">
+                  Session Code: <span className="font-mono font-bold text-stone-900">{sessionCode}</span>
                 </p>
               </div>
             </div>
@@ -583,17 +583,17 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                   }}
                   className={`rounded-2xl border-2 border-dashed p-4 text-center transition ${
                     isDragOverTemplate
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+                      ? 'border-stone-500 bg-stone-100'
+                      : 'border-stone-300 bg-stone-50 hover:border-stone-400'
                   } ${isSettingTemplate ? 'cursor-wait opacity-70' : 'cursor-pointer'}`}
                 >
-                  <UploadCloud className="mx-auto mb-2 h-5 w-5 text-slate-500" />
-                  <div className="text-sm font-medium text-slate-700">
+                  <UploadCloud className="mx-auto mb-2 h-5 w-5 text-stone-500" />
+                  <div className="text-sm font-medium text-stone-700">
                     {isSettingTemplate ? 'Importing template...' : 'Drag and drop DOCX here'}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">or click to browse files</div>
+                  <div className="mt-1 text-xs text-stone-500">or click to browse files</div>
                 </div>
-                <div className="mt-2 text-xs text-slate-500">{sessionHasTemplate ? 'Template set' : 'No template yet'}</div>
+                <div className="mt-2 text-xs text-stone-500">{sessionHasTemplate ? 'Template set' : 'No template yet'}</div>
               </div>
 
               <div className="mt-4 text-left">
