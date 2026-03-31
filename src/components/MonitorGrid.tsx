@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Monitor, User, Activity, FileText, Download, UploadCloud } from 'lucide-react';
+import { Monitor, User, Activity, FileText, Download, UploadCloud, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePeerConnection, StudentHeartbeat } from '../hooks/usePeerConnection';
 import { TeacherDocModal } from './TeacherDocModal';
@@ -16,6 +16,30 @@ interface MonitorGridProps {
   sessionCode: string;
 }
 
+type TeacherFeedbackForm = {
+  satisfactionRating: number;
+  navigationEaseRating: number;
+  offTaskDetectionRating: number;
+  distractionEliminationRating: number;
+  aiUsageDetectionRating: number;
+  classroomEffectivenessRating: number;
+  classroomChangesText: string;
+  redundantFeaturesText: string;
+  wishedFeaturesText: string;
+};
+
+const initialFeedbackForm: TeacherFeedbackForm = {
+  satisfactionRating: 0,
+  navigationEaseRating: 0,
+  offTaskDetectionRating: 0,
+  distractionEliminationRating: 0,
+  aiUsageDetectionRating: 0,
+  classroomEffectivenessRating: 0,
+  classroomChangesText: '',
+  redundantFeaturesText: '',
+  wishedFeaturesText: '',
+};
+
 export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [students, setStudents] = useState<Map<string, StudentStatus>>(new Map());
   const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
@@ -30,6 +54,10 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [isSettingInstructions, setIsSettingInstructions] = useState(false);
   const [isSettingTodo, setIsSettingTodo] = useState(false);
   const [isDragOverTemplate, setIsDragOverTemplate] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackForm, setFeedbackForm] = useState<TeacherFeedbackForm>(initialFeedbackForm);
   const templateInputRef = useRef<HTMLInputElement | null>(null);
 
   const cleanupDoneRef = useRef(false);
@@ -408,6 +436,56 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    setShowFeedbackForm(true);
+  };
+
+  const submitFeedback = async () => {
+    if (
+      !feedbackForm.satisfactionRating ||
+      !feedbackForm.navigationEaseRating ||
+      !feedbackForm.offTaskDetectionRating ||
+      !feedbackForm.distractionEliminationRating ||
+      !feedbackForm.aiUsageDetectionRating ||
+      !feedbackForm.classroomEffectivenessRating ||
+      !feedbackForm.classroomChangesText.trim() ||
+      !feedbackForm.redundantFeaturesText.trim() ||
+      !feedbackForm.wishedFeaturesText.trim()
+    ) {
+      alert('Please answer all feedback questions before submitting.');
+      return;
+    }
+
+    setIsSubmittingFeedback(true);
+    try {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const teacherId = userRes.user?.id ?? '';
+      if (!teacherId) throw new Error('You must be signed in as a teacher.');
+
+      const { error } = await supabase.from('teacher_feedback').upsert(
+        {
+          session_id: sessionId,
+          teacher_id: teacherId,
+          satisfaction_rating: feedbackForm.satisfactionRating,
+          navigation_ease_rating: feedbackForm.navigationEaseRating,
+          off_task_detection_rating: feedbackForm.offTaskDetectionRating,
+          distraction_elimination_rating: feedbackForm.distractionEliminationRating,
+          ai_usage_detection_rating: feedbackForm.aiUsageDetectionRating,
+          classroom_effectiveness_rating: feedbackForm.classroomEffectivenessRating,
+          classroom_changes_text: feedbackForm.classroomChangesText.trim(),
+          redundant_features_text: feedbackForm.redundantFeaturesText.trim(),
+          wished_features_text: feedbackForm.wishedFeaturesText.trim(),
+        },
+        { onConflict: 'session_id,teacher_id' }
+      );
+      if (error) throw error;
+      setFeedbackSubmitted(true);
+    } catch (err) {
+      console.error('Error saving teacher feedback:', err);
+      alert('Failed to submit feedback. Please try again.');
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   const cleanupSessionData = useCallback(async () => {
@@ -716,6 +794,178 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
             <User className="mx-auto mb-4 h-16 w-16 text-slate-400" />
             <p className="text-lg text-slate-700">No students have joined yet</p>
             <p className="text-sm text-slate-500">Share the session code with your students</p>
+          </div>
+        )}
+
+        {showFeedbackForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4 backdrop-blur-sm">
+            <div className="app-card w-full max-w-3xl max-h-[90vh] overflow-auto p-6">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-stone-900">Teacher Feedback Form</h2>
+                  <p className="text-sm text-stone-600">
+                    Thank you for exporting your class data. Please share your feedback to help improve Lockd.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-700"
+                  onClick={() => setShowFeedbackForm(false)}
+                  aria-label="Close feedback form"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {feedbackSubmitted ? (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700">
+                  Feedback submitted. Thank you for helping shape the roadmap.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-stone-700">
+                    Please rate your satisfaction with the tool on a scale of 1-4 from least to greatest
+                    <select
+                      value={feedbackForm.satisfactionRating || ''}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, satisfactionRating: Number(e.target.value) }))}
+                      className="input-base mt-2"
+                    >
+                      <option value="">Select a rating</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Please rate how easy it was to navigate the tool on a scale of 1-4 from least to greatest
+                    <select
+                      value={feedbackForm.navigationEaseRating || ''}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, navigationEaseRating: Number(e.target.value) }))}
+                      className="input-base mt-2"
+                    >
+                      <option value="">Select a rating</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Please rate how effective you found the tool to be at identifying off-task students on a scale of 1-4 from least to greatest
+                    <select
+                      value={feedbackForm.offTaskDetectionRating || ''}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, offTaskDetectionRating: Number(e.target.value) }))}
+                      className="input-base mt-2"
+                    >
+                      <option value="">Select a rating</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Please rate how effective you found the tool to be at eliminating distractions in the classroom on a scale of 1-4 least to greatest
+                    <select
+                      value={feedbackForm.distractionEliminationRating || ''}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, distractionEliminationRating: Number(e.target.value) }))}
+                      className="input-base mt-2"
+                    >
+                      <option value="">Select a rating</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Please rate how effective you found the tool to be at identifying possible AI usage on a scale of 1-4 from least to greatest
+                    <select
+                      value={feedbackForm.aiUsageDetectionRating || ''}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, aiUsageDetectionRating: Number(e.target.value) }))}
+                      className="input-base mt-2"
+                    >
+                      <option value="">Select a rating</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Please rate the effectiveness of the tool in your classroom scale of 1-5: 1 (Very bad), 2 (Bad), 3 (No change), 4 (Positive), 5 (Very positive)
+                    <select
+                      value={feedbackForm.classroomEffectivenessRating || ''}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, classroomEffectivenessRating: Number(e.target.value) }))}
+                      className="input-base mt-2"
+                    >
+                      <option value="">Select a rating</option>
+                      <option value="1">1 (Very bad)</option>
+                      <option value="2">2 (Bad)</option>
+                      <option value="3">3 (No change)</option>
+                      <option value="4">4 (Positive)</option>
+                      <option value="5">5 (Very positive)</option>
+                    </select>
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Please indicate what kind of changes you have seen in your classroom following the implementation of the tool. (open-ended)
+                    <textarea
+                      value={feedbackForm.classroomChangesText}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, classroomChangesText: e.target.value }))}
+                      className="textarea-base mt-2 h-24"
+                    />
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Are there any features you find redundant or should be removed or changed? (open-ended)
+                    <textarea
+                      value={feedbackForm.redundantFeaturesText}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, redundantFeaturesText: e.target.value }))}
+                      className="textarea-base mt-2 h-24"
+                    />
+                  </label>
+
+                  <label className="block text-sm font-medium text-stone-700">
+                    Are there any features you wish were implemented but aren't? (open-ended)
+                    <textarea
+                      value={feedbackForm.wishedFeaturesText}
+                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, wishedFeaturesText: e.target.value }))}
+                      className="textarea-base mt-2 h-24"
+                    />
+                  </label>
+                </div>
+              )}
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setShowFeedbackForm(false);
+                    if (!feedbackSubmitted) setFeedbackForm(initialFeedbackForm);
+                  }}
+                >
+                  {feedbackSubmitted ? 'Close' : 'Maybe later'}
+                </button>
+                {!feedbackSubmitted ? (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={submitFeedback}
+                    disabled={isSubmittingFeedback}
+                  >
+                    {isSubmittingFeedback ? 'Submitting...' : 'Submit feedback'}
+                  </button>
+                ) : null}
+              </div>
+            </div>
           </div>
         )}
       </div>
