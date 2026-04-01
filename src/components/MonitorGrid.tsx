@@ -40,6 +40,86 @@ const initialFeedbackForm: TeacherFeedbackForm = {
   wishedFeaturesText: '',
 };
 
+const CLASSROOM_EFFECTIVENESS_LABELS = [
+  'Very bad',
+  'Bad',
+  'No change',
+  'Positive',
+  'Very positive',
+] as const;
+
+function FeedbackScale4({
+  value,
+  onChange,
+  name,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  name: string;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2" role="radiogroup" aria-label={name}>
+      {[1, 2, 3, 4].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={value === n}
+          onClick={() => onChange(n)}
+          className={`flex h-11 min-w-[2.75rem] items-center justify-center rounded-full border-2 px-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-[#673ab7]/45 focus:ring-offset-2 ${
+            value === n
+              ? 'border-[#673ab7] bg-[#673ab7] text-white shadow-sm'
+              : 'border-stone-300 bg-white text-stone-800 hover:border-stone-400'
+          }`}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FeedbackScale5({
+  value,
+  onChange,
+  name,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  name: string;
+}) {
+  return (
+    <div className="mt-3" role="radiogroup" aria-label={name}>
+      <div className="flex flex-wrap items-start gap-3 sm:gap-4">
+        {CLASSROOM_EFFECTIVENESS_LABELS.map((label, i) => {
+          const n = i + 1;
+          return (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={value === n}
+              onClick={() => onChange(n)}
+              className="flex flex-col items-center gap-1.5 focus:outline-none"
+            >
+              <span
+                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-medium transition focus:ring-2 focus:ring-[#673ab7]/45 focus:ring-offset-2 ${
+                  value === n
+                    ? 'border-[#673ab7] bg-[#673ab7] text-white shadow-sm'
+                    : 'border-stone-300 bg-white text-stone-800 hover:border-stone-400'
+                }`}
+              >
+                {n}
+              </span>
+              <span className="max-w-[4.75rem] text-center text-[11px] leading-tight text-stone-500">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [students, setStudents] = useState<Map<string, StudentStatus>>(new Map());
   const [openDoc, setOpenDoc] = useState<{ documentId: string; studentName: string } | null>(null);
@@ -798,155 +878,146 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         )}
 
         {showFeedbackForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4 backdrop-blur-sm">
-            <div className="app-card w-full max-w-3xl max-h-[90vh] overflow-auto p-6">
-              <div className="mb-4 flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-stone-900">Teacher Feedback Form</h2>
-                  <p className="text-sm text-stone-600">
-                    Thank you for exporting your class data. Please share your feedback to help improve Lockd.
-                  </p>
-                </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#f0ebf8] p-4 sm:p-6">
+            <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-stone-200/80 bg-white shadow-lg">
+              <div className="relative bg-[#673ab7] px-6 py-5 text-white">
                 <button
                   type="button"
-                  className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-700"
+                  className="absolute right-3 top-3 rounded-lg p-2 text-white/90 hover:bg-white/10"
                   onClick={() => setShowFeedbackForm(false)}
                   aria-label="Close feedback form"
                 >
                   <X className="h-4 w-4" />
                 </button>
+                <h2 className="pr-10 text-2xl font-normal tracking-tight">Lockd feedback</h2>
+                <p className="mt-2 text-sm leading-relaxed text-white/90">
+                  Thanks for exporting your class data. Your answers help improve Lockd.
+                </p>
               </div>
 
-              {feedbackSubmitted ? (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700">
-                  Feedback submitted. Thank you for helping shape the roadmap.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <label className="block text-sm font-medium text-stone-700">
-                    Please rate your satisfaction with the tool on a scale of 1-4 from least to greatest
-                    <select
-                      value={feedbackForm.satisfactionRating || ''}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, satisfactionRating: Number(e.target.value) }))}
-                      className="input-base mt-2"
-                    >
-                      <option value="">Select a rating</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                    </select>
-                  </label>
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-1">
+                {feedbackSubmitted ? (
+                  <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+                    Response recorded. Thank you for helping shape the roadmap.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-stone-100">
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        How satisfied are you with Lockd overall?
+                      </p>
+                      <p className="mt-1 text-xs text-stone-500">Scale: 1 = least satisfied, 4 = most satisfied</p>
+                      <FeedbackScale4
+                        name="Overall satisfaction"
+                        value={feedbackForm.satisfactionRating}
+                        onChange={(n) => setFeedbackForm((prev) => ({ ...prev, satisfactionRating: n }))}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Please rate how easy it was to navigate the tool on a scale of 1-4 from least to greatest
-                    <select
-                      value={feedbackForm.navigationEaseRating || ''}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, navigationEaseRating: Number(e.target.value) }))}
-                      className="input-base mt-2"
-                    >
-                      <option value="">Select a rating</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                    </select>
-                  </label>
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">How easy was it to navigate the tool?</p>
+                      <p className="mt-1 text-xs text-stone-500">Scale: 1 = hardest, 4 = easiest</p>
+                      <FeedbackScale4
+                        name="Navigation ease"
+                        value={feedbackForm.navigationEaseRating}
+                        onChange={(n) => setFeedbackForm((prev) => ({ ...prev, navigationEaseRating: n }))}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Please rate how effective you found the tool to be at identifying off-task students on a scale of 1-4 from least to greatest
-                    <select
-                      value={feedbackForm.offTaskDetectionRating || ''}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, offTaskDetectionRating: Number(e.target.value) }))}
-                      className="input-base mt-2"
-                    >
-                      <option value="">Select a rating</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                    </select>
-                  </label>
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        How effective was Lockd at helping you spot off-task students?
+                      </p>
+                      <p className="mt-1 text-xs text-stone-500">Scale: 1 = not effective, 4 = very effective</p>
+                      <FeedbackScale4
+                        name="Off-task detection"
+                        value={feedbackForm.offTaskDetectionRating}
+                        onChange={(n) => setFeedbackForm((prev) => ({ ...prev, offTaskDetectionRating: n }))}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Please rate how effective you found the tool to be at eliminating distractions in the classroom on a scale of 1-4 least to greatest
-                    <select
-                      value={feedbackForm.distractionEliminationRating || ''}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, distractionEliminationRating: Number(e.target.value) }))}
-                      className="input-base mt-2"
-                    >
-                      <option value="">Select a rating</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                    </select>
-                  </label>
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        How effective was Lockd at reducing classroom distractions?
+                      </p>
+                      <p className="mt-1 text-xs text-stone-500">Scale: 1 = not effective, 4 = very effective</p>
+                      <FeedbackScale4
+                        name="Distraction reduction"
+                        value={feedbackForm.distractionEliminationRating}
+                        onChange={(n) => setFeedbackForm((prev) => ({ ...prev, distractionEliminationRating: n }))}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Please rate how effective you found the tool to be at identifying possible AI usage on a scale of 1-4 from least to greatest
-                    <select
-                      value={feedbackForm.aiUsageDetectionRating || ''}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, aiUsageDetectionRating: Number(e.target.value) }))}
-                      className="input-base mt-2"
-                    >
-                      <option value="">Select a rating</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                    </select>
-                  </label>
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        How effective was Lockd at surfacing possible AI use?
+                      </p>
+                      <p className="mt-1 text-xs text-stone-500">Scale: 1 = not effective, 4 = very effective</p>
+                      <FeedbackScale4
+                        name="AI usage detection"
+                        value={feedbackForm.aiUsageDetectionRating}
+                        onChange={(n) => setFeedbackForm((prev) => ({ ...prev, aiUsageDetectionRating: n }))}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Please rate the effectiveness of the tool in your classroom scale of 1-5: 1 (Very bad), 2 (Bad), 3 (No change), 4 (Positive), 5 (Very positive)
-                    <select
-                      value={feedbackForm.classroomEffectivenessRating || ''}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, classroomEffectivenessRating: Number(e.target.value) }))}
-                      className="input-base mt-2"
-                    >
-                      <option value="">Select a rating</option>
-                      <option value="1">1 (Very bad)</option>
-                      <option value="2">2 (Bad)</option>
-                      <option value="3">3 (No change)</option>
-                      <option value="4">4 (Positive)</option>
-                      <option value="5">5 (Very positive)</option>
-                    </select>
-                  </label>
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        Overall, how effective has Lockd been in your classroom?
+                      </p>
+                      <p className="mt-1 text-xs text-stone-500">Tap a number to respond</p>
+                      <FeedbackScale5
+                        name="Classroom effectiveness"
+                        value={feedbackForm.classroomEffectivenessRating}
+                        onChange={(n) => setFeedbackForm((prev) => ({ ...prev, classroomEffectivenessRating: n }))}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Please indicate what kind of changes you have seen in your classroom following the implementation of the tool. (open-ended)
-                    <textarea
-                      value={feedbackForm.classroomChangesText}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, classroomChangesText: e.target.value }))}
-                      className="textarea-base mt-2 h-24"
-                    />
-                  </label>
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        What changes have you noticed in your classroom since using Lockd?
+                      </p>
+                      <textarea
+                        value={feedbackForm.classroomChangesText}
+                        onChange={(e) => setFeedbackForm((prev) => ({ ...prev, classroomChangesText: e.target.value }))}
+                        placeholder="Your answer"
+                        className="textarea-base mt-3 min-h-[100px] w-full rounded-md border border-b-2 border-stone-200 border-b-stone-300 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-b-[#673ab7] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#673ab7]/30"
+                        rows={4}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Are there any features you find redundant or should be removed or changed? (open-ended)
-                    <textarea
-                      value={feedbackForm.redundantFeaturesText}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, redundantFeaturesText: e.target.value }))}
-                      className="textarea-base mt-2 h-24"
-                    />
-                  </label>
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        Are there features that feel redundant, or that you would remove or change?
+                      </p>
+                      <textarea
+                        value={feedbackForm.redundantFeaturesText}
+                        onChange={(e) => setFeedbackForm((prev) => ({ ...prev, redundantFeaturesText: e.target.value }))}
+                        placeholder="Your answer"
+                        className="textarea-base mt-3 min-h-[100px] w-full rounded-md border border-b-2 border-stone-200 border-b-stone-300 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-b-[#673ab7] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#673ab7]/30"
+                        rows={4}
+                      />
+                    </div>
 
-                  <label className="block text-sm font-medium text-stone-700">
-                    Are there any features you wish were implemented but aren't? (open-ended)
-                    <textarea
-                      value={feedbackForm.wishedFeaturesText}
-                      onChange={(e) => setFeedbackForm((prev) => ({ ...prev, wishedFeaturesText: e.target.value }))}
-                      className="textarea-base mt-2 h-24"
-                    />
-                  </label>
-                </div>
-              )}
+                    <div className="py-5">
+                      <p className="text-sm leading-snug text-stone-900">
+                        What features do you wish Lockd had that are not there yet?
+                      </p>
+                      <textarea
+                        value={feedbackForm.wishedFeaturesText}
+                        onChange={(e) => setFeedbackForm((prev) => ({ ...prev, wishedFeaturesText: e.target.value }))}
+                        placeholder="Your answer"
+                        className="textarea-base mt-3 min-h-[100px] w-full rounded-md border border-b-2 border-stone-200 border-b-stone-300 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-b-[#673ab7] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#673ab7]/30"
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 bg-stone-50/80 px-6 py-4">
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50"
                   onClick={() => {
                     setShowFeedbackForm(false);
                     if (!feedbackSubmitted) setFeedbackForm(initialFeedbackForm);
@@ -957,11 +1028,11 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 {!feedbackSubmitted ? (
                   <button
                     type="button"
-                    className="btn-primary"
+                    className="rounded bg-[#673ab7] px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#5e35b1] disabled:opacity-60"
                     onClick={submitFeedback}
                     disabled={isSubmittingFeedback}
                   >
-                    {isSubmittingFeedback ? 'Submitting...' : 'Submit feedback'}
+                    {isSubmittingFeedback ? 'Submitting...' : 'Submit'}
                   </button>
                 ) : null}
               </div>
