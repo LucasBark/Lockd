@@ -58,7 +58,11 @@ function FeedbackScale4({
   name: string;
 }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2" role="radiogroup" aria-label={name}>
+    <div
+      className="mt-3 flex flex-wrap items-center justify-center gap-2"
+      role="radiogroup"
+      aria-label={name}
+    >
       {[1, 2, 3, 4].map((n) => (
         <button
           key={n}
@@ -66,9 +70,9 @@ function FeedbackScale4({
           role="radio"
           aria-checked={value === n}
           onClick={() => onChange(n)}
-          className={`flex h-11 min-w-[2.75rem] items-center justify-center rounded-full border-2 px-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-[#673ab7]/45 focus:ring-offset-2 ${
+          className={`flex h-11 min-w-[2.75rem] items-center justify-center rounded-full border-2 px-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-stone-200 focus:ring-offset-2 ${
             value === n
-              ? 'border-[#673ab7] bg-[#673ab7] text-white shadow-sm'
+              ? 'border-stone-900 bg-stone-900 text-white shadow-sm'
               : 'border-stone-300 bg-white text-stone-800 hover:border-stone-400'
           }`}
         >
@@ -89,8 +93,8 @@ function FeedbackScale5({
   name: string;
 }) {
   return (
-    <div className="mt-3" role="radiogroup" aria-label={name}>
-      <div className="flex flex-wrap items-start gap-3 sm:gap-4">
+    <div className="mt-3 flex justify-center" role="radiogroup" aria-label={name}>
+      <div className="flex max-w-full flex-wrap items-start justify-center gap-3 sm:gap-4">
         {CLASSROOM_EFFECTIVENESS_LABELS.map((label, i) => {
           const n = i + 1;
           return (
@@ -103,9 +107,9 @@ function FeedbackScale5({
               className="flex flex-col items-center gap-1.5 focus:outline-none"
             >
               <span
-                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-medium transition focus:ring-2 focus:ring-[#673ab7]/45 focus:ring-offset-2 ${
+                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-medium transition focus:ring-2 focus:ring-stone-200 focus:ring-offset-2 ${
                   value === n
-                    ? 'border-[#673ab7] bg-[#673ab7] text-white shadow-sm'
+                    ? 'border-stone-900 bg-stone-900 text-white shadow-sm'
                     : 'border-stone-300 bg-white text-stone-800 hover:border-stone-400'
                 }`}
               >
@@ -878,21 +882,23 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         )}
 
         {showFeedbackForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#f0ebf8] p-4 sm:p-6">
-            <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-stone-200/80 bg-white shadow-lg">
-              <div className="relative bg-[#673ab7] px-6 py-5 text-white">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-sm sm:p-6">
+            <div className="app-card flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden">
+              <div className="flex items-start justify-between gap-4 border-b border-stone-200 px-6 py-5">
+                <div>
+                  <h2 className="text-lg font-semibold text-stone-900">Lockd feedback</h2>
+                  <p className="mt-1 text-sm text-stone-600">
+                    Thanks for exporting your class data. Your answers help improve Lockd.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  className="absolute right-3 top-3 rounded-lg p-2 text-white/90 hover:bg-white/10"
+                  className="rounded-xl p-2 transition hover:bg-stone-100"
                   onClick={() => setShowFeedbackForm(false)}
                   aria-label="Close feedback form"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5 text-stone-700" />
                 </button>
-                <h2 className="pr-10 text-2xl font-normal tracking-tight">Lockd feedback</h2>
-                <p className="mt-2 text-sm leading-relaxed text-white/90">
-                  Thanks for exporting your class data. Your answers help improve Lockd.
-                </p>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-1">
@@ -980,7 +986,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                         value={feedbackForm.classroomChangesText}
                         onChange={(e) => setFeedbackForm((prev) => ({ ...prev, classroomChangesText: e.target.value }))}
                         placeholder="Your answer"
-                        className="textarea-base mt-3 min-h-[100px] w-full rounded-md border border-b-2 border-stone-200 border-b-stone-300 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-b-[#673ab7] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#673ab7]/30"
+                        className="textarea-base mt-3 min-h-[100px]"
                         rows={4}
                       />
                     </div>
@@ -993,7 +999,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                         value={feedbackForm.redundantFeaturesText}
                         onChange={(e) => setFeedbackForm((prev) => ({ ...prev, redundantFeaturesText: e.target.value }))}
                         placeholder="Your answer"
-                        className="textarea-base mt-3 min-h-[100px] w-full rounded-md border border-b-2 border-stone-200 border-b-stone-300 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-b-[#673ab7] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#673ab7]/30"
+                        className="textarea-base mt-3 min-h-[100px]"
                         rows={4}
                       />
                     </div>
@@ -1006,7 +1012,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                         value={feedbackForm.wishedFeaturesText}
                         onChange={(e) => setFeedbackForm((prev) => ({ ...prev, wishedFeaturesText: e.target.value }))}
                         placeholder="Your answer"
-                        className="textarea-base mt-3 min-h-[100px] w-full rounded-md border border-b-2 border-stone-200 border-b-stone-300 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-b-[#673ab7] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#673ab7]/30"
+                        className="textarea-base mt-3 min-h-[100px]"
                         rows={4}
                       />
                     </div>
@@ -1014,10 +1020,10 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 bg-stone-50/80 px-6 py-4">
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-stone-200 bg-stone-50/90 px-6 py-4">
                 <button
                   type="button"
-                  className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50"
+                  className="btn-secondary"
                   onClick={() => {
                     setShowFeedbackForm(false);
                     if (!feedbackSubmitted) setFeedbackForm(initialFeedbackForm);
@@ -1028,7 +1034,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 {!feedbackSubmitted ? (
                   <button
                     type="button"
-                    className="rounded bg-[#673ab7] px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#5e35b1] disabled:opacity-60"
+                    className="btn-primary"
                     onClick={submitFeedback}
                     disabled={isSubmittingFeedback}
                   >
