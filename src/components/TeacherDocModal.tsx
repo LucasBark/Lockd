@@ -319,7 +319,7 @@ export function TeacherDocModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4">
           <div>
             <div className="text-lg font-semibold text-stone-900">Student doc: {studentName}</div>
@@ -334,8 +334,8 @@ export function TeacherDocModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-0 lg:grid-cols-2">
-          <div className="border-b border-stone-200 p-6 lg:border-b-0 lg:border-r">
+        <div className="grid min-h-0 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-2">
+          <div className="border-b border-stone-200 p-5 lg:border-b-0 lg:border-r">
             <div className="mb-2 text-sm font-medium text-stone-700">Preview (select text to anchor a suggestion)</div>
             {assignmentInstructionsHtml ? (
               <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50/80 p-3 text-sm text-slate-800">
@@ -348,12 +348,12 @@ export function TeacherDocModal({
               readOnly
               onMouseUp={captureSelection}
               onKeyUp={captureSelection}
-              className="h-[420px] w-full whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 font-sans text-sm"
+              className="h-[300px] w-full whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 font-sans text-sm"
             />
             <div className="mt-3">
               <div className="mb-1 text-xs font-medium text-slate-600">Rendered preview</div>
               <div
-                className="max-h-40 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                className="max-h-28 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-sm"
                 dangerouslySetInnerHTML={{ __html: contentHtml || '' }}
               />
             </div>
@@ -362,7 +362,7 @@ export function TeacherDocModal({
             </div>
           </div>
 
-          <div className="p-6">
+          <div className="p-5">
             <div className="mb-5">
               <div className="mb-2 text-sm font-medium text-slate-700">Assignment</div>
 
@@ -477,7 +477,7 @@ export function TeacherDocModal({
             {isLoading ? (
               <div className="mt-4 text-sm text-slate-500">Loading…</div>
             ) : (
-              <div className="mt-4 space-y-3 max-h-[380px] overflow-auto pr-1">
+              <div className="mt-4 max-h-[260px] space-y-3 overflow-auto pr-1">
                 {suggestions.length === 0 ? (
                   <div className="text-sm text-slate-500">No suggestions yet.</div>
                 ) : (
