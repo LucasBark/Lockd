@@ -13,6 +13,9 @@ type SuggestionRow = {
 };
 
 type TodoItem = { id: string; text: string; completed: boolean };
+const RUBRIC_LEVELS = ['Outstanding', 'Good', 'Competent', 'Approaching', 'Needs Revision'] as const;
+type RubricLevel = (typeof RUBRIC_LEVELS)[number];
+type RubricScores = Record<string, RubricLevel>;
 
 export function TeacherDocModal({
   documentId,
@@ -32,6 +35,9 @@ export function TeacherDocModal({
   const [assignmentInstructionsText, setAssignmentInstructionsText] = useState('');
   const [assignmentInstructionsHtml, setAssignmentInstructionsHtml] = useState('');
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
+  const [sessionRubricCategories, setSessionRubricCategories] = useState<string[]>([]);
+  const [rubricScores, setRubricScores] = useState<RubricScores>({});
+  const [isSavingRubric, setIsSavingRubric] = useState(false);
 
   const [selectedText, setSelectedText] = useState('');
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
@@ -56,7 +62,7 @@ export function TeacherDocModal({
       supabase
         .from('documents')
         .select(
-          'content,content_text,paste_count,stagnant_count,assignment_instructions_text,assignment_instructions_html,todo_list_json'
+          'session_id,content,content_text,paste_count,stagnant_count,assignment_instructions_text,assignment_instructions_html,todo_list_json,rubric_scores'
         )
         .eq('id', documentId)
         .maybeSingle(),
@@ -72,6 +78,7 @@ export function TeacherDocModal({
         if (sugRes.error) console.error('Error loading suggestions:', sugRes.error);
 
         if (docRes.data) {
+          const sessionId = typeof docRes.data.session_id === 'string' ? docRes.data.session_id : '';
           setContentHtml(docRes.data.content ?? '');
           setContentText(docRes.data.content_text ?? '');
           setPasteCount(typeof docRes.data.paste_count === 'number' ? docRes.data.paste_count : 0);
@@ -79,12 +86,46 @@ export function TeacherDocModal({
           setAssignmentInstructionsText(docRes.data.assignment_instructions_text ?? '');
           setAssignmentInstructionsHtml(docRes.data.assignment_instructions_html ?? '');
           setTodoList((docRes.data.todo_list_json as TodoItem[]) ?? []);
+          if (
+            docRes.data.rubric_scores &&
+            typeof docRes.data.rubric_scores === 'object' &&
+            !Array.isArray(docRes.data.rubric_scores)
+          ) {
+            const nextScores: RubricScores = {};
+            Object.entries(docRes.data.rubric_scores as Record<string, unknown>).forEach(([k, v]) => {
+              if (typeof k !== 'string' || typeof v !== 'string') return;
+              if (RUBRIC_LEVELS.includes(v as RubricLevel)) nextScores[k] = v as RubricLevel;
+            });
+            setRubricScores(nextScores);
+          } else {
+            setRubricScores({});
+          }
           setTodoEditorText(
             ((docRes.data.todo_list_json as TodoItem[]) ?? [])
               .map((t) => t.text)
               .filter((t) => typeof t === 'string' && t.trim().length > 0)
               .join('\n')
           );
+          if (sessionId) {
+            supabase
+              .from('sessions')
+              .select('rubric_categories')
+              .eq('id', sessionId)
+              .maybeSingle()
+              .then(({ data, error }) => {
+                if (error) {
+                  console.error('Error loading rubric:', error);
+                  return;
+                }
+                const categories = Array.isArray(data?.rubric_categories)
+                  ? (data?.rubric_categories as unknown[])
+                      .filter((v): v is string => typeof v === 'string')
+                      .map((v) => v.trim())
+                      .filter(Boolean)
+                  : [];
+                setSessionRubricCategories(categories);
+              });
+          }
         }
         if (sugRes.data) setSuggestions(sugRes.data as SuggestionRow[]);
       })
@@ -106,6 +147,7 @@ export function TeacherDocModal({
             todo_list_json?: TodoItem[];
             assignment_instructions_text?: string;
             assignment_instructions_html?: string;
+            rubric_scores?: Record<string, unknown>;
           };
           if (typeof next.content === 'string') setContentHtml(next.content);
           if (typeof next.content_text === 'string') setContentText(next.content_text);
@@ -114,6 +156,15 @@ export function TeacherDocModal({
           if (Array.isArray(next.todo_list_json)) setTodoList(next.todo_list_json as TodoItem[]);
           if (typeof next.assignment_instructions_text === 'string') setAssignmentInstructionsText(next.assignment_instructions_text);
           if (typeof next.assignment_instructions_html === 'string') setAssignmentInstructionsHtml(next.assignment_instructions_html);
+          if (next.rubric_scores && typeof next.rubric_scores === 'object' && !Array.isArray(next.rubric_scores)) {
+            const nextScores: RubricScores = {};
+            Object.entries(next.rubric_scores as Record<string, unknown>).forEach(([k, v]) => {
+              if (typeof v === 'string' && RUBRIC_LEVELS.includes(v as RubricLevel)) {
+                nextScores[k] = v as RubricLevel;
+              }
+            });
+            setRubricScores(nextScores);
+          }
         }
       )
       .subscribe();
@@ -244,6 +295,28 @@ export function TeacherDocModal({
     }
   };
 
+  const setRubricLevel = (category: string, level: RubricLevel) => {
+    setRubricScores((prev) => ({ ...prev, [category]: level }));
+  };
+
+  const saveRubricScores = async () => {
+    setIsSavingRubric(true);
+    try {
+      const filtered: RubricScores = {};
+      sessionRubricCategories.forEach((category) => {
+        const selected = rubricScores[category];
+        if (selected && RUBRIC_LEVELS.includes(selected)) filtered[category] = selected;
+      });
+      const { error } = await supabase.from('documents').update({ rubric_scores: filtered }).eq('id', documentId);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error saving rubric scores:', err);
+      alert('Failed to save rubric scores.');
+    } finally {
+      setIsSavingRubric(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-sm">
       <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
@@ -319,6 +392,64 @@ export function TeacherDocModal({
                 </label>
               </div>
             </div>
+
+            {sessionRubricCategories.length > 0 ? (
+              <div className="mb-6 rounded-xl border border-stone-200 bg-stone-50/70 p-4">
+                <div className="mb-3 text-sm font-medium text-stone-800">Rubric scoring</div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0 overflow-hidden rounded-lg border border-stone-200 bg-white">
+                    <thead>
+                      <tr className="bg-stone-100/80">
+                        <th className="border-b border-r border-stone-200 px-3 py-2 text-left text-xs font-semibold text-stone-700">
+                          Category
+                        </th>
+                        {RUBRIC_LEVELS.map((level) => (
+                          <th key={level} className="border-b border-stone-200 px-2 py-2 text-center text-xs font-semibold text-stone-700">
+                            {level}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sessionRubricCategories.map((category, idx) => (
+                        <tr key={category} className={idx % 2 === 0 ? 'bg-white' : 'bg-stone-50/50'}>
+                          <td className="border-r border-stone-200 px-3 py-2 text-sm font-medium text-stone-800">{category}</td>
+                          {RUBRIC_LEVELS.map((level) => {
+                            const selected = rubricScores[category] === level;
+                            return (
+                              <td key={level} className="px-2 py-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setRubricLevel(category, level)}
+                                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-stone-200 ${
+                                    selected
+                                      ? 'border-stone-900 bg-stone-900 text-white'
+                                      : 'border-stone-300 bg-white text-stone-600 hover:border-stone-400'
+                                  }`}
+                                  title={`${category}: ${level}`}
+                                  aria-label={`${category}: ${level}`}
+                                >
+                                  {selected ? '●' : ''}
+                                </button>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 flex items-center justify-end">
+                  <button type="button" onClick={saveRubricScores} disabled={isSavingRubric} className="btn-primary">
+                    {isSavingRubric ? 'Saving...' : 'Save rubric scores'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6 rounded-xl border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                No rubric set for this assignment. You can add one from the class dashboard.
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="text-sm font-medium text-slate-700">Suggestions</div>

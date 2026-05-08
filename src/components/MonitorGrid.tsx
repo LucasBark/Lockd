@@ -9,6 +9,7 @@ interface StudentStatus extends StudentHeartbeat {
   pasteCount: number;
   stagnantCount: number;
   tabbedOutCount: number;
+  rubricScores: Record<string, RubricLevel>;
 }
 
 interface MonitorGridProps {
@@ -27,6 +28,9 @@ type TeacherFeedbackForm = {
   redundantFeaturesText: string;
   wishedFeaturesText: string;
 };
+
+const RUBRIC_LEVELS = ['Outstanding', 'Good', 'Competent', 'Approaching', 'Needs Revision'] as const;
+type RubricLevel = (typeof RUBRIC_LEVELS)[number];
 
 const initialFeedbackForm: TeacherFeedbackForm = {
   satisfactionRating: 0,
@@ -137,6 +141,9 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   const [sessionTodoText, setSessionTodoText] = useState<string>('');
   const [isSettingInstructions, setIsSettingInstructions] = useState(false);
   const [isSettingTodo, setIsSettingTodo] = useState(false);
+  const [sessionRubricCategories, setSessionRubricCategories] = useState<string[]>([]);
+  const [sessionRubricText, setSessionRubricText] = useState('');
+  const [isSettingRubric, setIsSettingRubric] = useState(false);
   const [isDragOverTemplate, setIsDragOverTemplate] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
@@ -175,6 +182,20 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
       .map((t) => (t as string).trim())
       .join('\n');
   }, []);
+
+  const rubricTextToCategories = useCallback((text: string) => {
+    const seen = new Set<string>();
+    return (text ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line) => {
+        const key = line.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, []);
   const handleHeartbeat = useCallback((data: StudentHeartbeat) => {
     setStudents((prev) => {
       const newMap = new Map(prev);
@@ -185,6 +206,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         pasteCount: existing?.pasteCount ?? 0,
         stagnantCount: existing?.stagnantCount ?? 0,
         tabbedOutCount: existing?.tabbedOutCount ?? 0,
+        rubricScores: existing?.rubricScores ?? {},
       });
       return newMap;
     });
@@ -211,7 +233,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     let mounted = true;
     supabase
       .from('sessions')
-      .select('title,is_active,ended_at,assignment_template_text,assignment_instructions_text,todo_list_json')
+      .select('title,is_active,ended_at,assignment_template_text,assignment_instructions_text,todo_list_json,rubric_categories')
       .eq('id', sessionId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -231,6 +253,14 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         }
         if (typeof data?.todo_list_json !== 'undefined') {
           setSessionTodoText(todoJsonToText(data.todo_list_json));
+        }
+        if (Array.isArray(data?.rubric_categories)) {
+          const categories = (data.rubric_categories as unknown[])
+            .filter((v): v is string => typeof v === 'string')
+            .map((v) => v.trim())
+            .filter(Boolean);
+          setSessionRubricCategories(categories);
+          setSessionRubricText(categories.join('\n'));
         }
       });
     return () => {
@@ -360,6 +390,26 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     }
   };
 
+  const handleSetRubric = async () => {
+    setIsSettingRubric(true);
+    try {
+      const categories = rubricTextToCategories(sessionRubricText);
+      const { error } = await supabase
+        .from('sessions')
+        .update({ rubric_categories: categories })
+        .eq('id', sessionId);
+      if (error) throw error;
+
+      setSessionRubricCategories(categories);
+      setSessionRubricText(categories.join('\n'));
+    } catch (err) {
+      console.error('Error saving rubric:', err);
+      alert('Failed to save rubric.');
+    } finally {
+      setIsSettingRubric(false);
+    }
+  };
+
   // Persist session so teacher can rejoin after closing tab or navigating back
   useEffect(() => {
     if (sessionId && sessionCode) {
@@ -402,6 +452,10 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
               pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
               stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
               tabbedOutCount: typeof doc.tabbed_out_count === 'number' ? doc.tabbed_out_count : (existing?.tabbedOutCount ?? 0),
+              rubricScores:
+                doc.rubric_scores && typeof doc.rubric_scores === 'object' && !Array.isArray(doc.rubric_scores)
+                  ? (doc.rubric_scores as Record<string, RubricLevel>)
+                  : (existing?.rubricScores ?? {}),
             });
           });
           return newMap;
@@ -438,6 +492,10 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                 pasteCount: typeof doc.paste_count === 'number' ? doc.paste_count : (existing?.pasteCount ?? 0),
                 stagnantCount: typeof doc.stagnant_count === 'number' ? doc.stagnant_count : (existing?.stagnantCount ?? 0),
                 tabbedOutCount: typeof doc.tabbed_out_count === 'number' ? doc.tabbed_out_count : (existing?.tabbedOutCount ?? 0),
+                rubricScores:
+                  doc.rubric_scores && typeof doc.rubric_scores === 'object' && !Array.isArray(doc.rubric_scores)
+                    ? (doc.rubric_scores as Record<string, RubricLevel>)
+                    : (existing?.rubricScores ?? {}),
               });
               return newMap;
             });
@@ -467,12 +525,39 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
     return 'Active';
   };
 
+  const rubricScoreValue: Record<RubricLevel, number> = {
+    Outstanding: 5,
+    Good: 4,
+    Competent: 3,
+    Approaching: 2,
+    'Needs Revision': 1,
+  };
+
+  const getRubricSummary = (student: StudentStatus) => {
+    if (sessionRubricCategories.length === 0) return null;
+    const scoredCount = sessionRubricCategories.reduce((count, category) => {
+      const level = student.rubricScores?.[category];
+      if (level && RUBRIC_LEVELS.includes(level)) return count + 1;
+      return count;
+    }, 0);
+    const totalPoints = sessionRubricCategories.reduce((sum, category) => {
+      const level = student.rubricScores?.[category];
+      if (!level || !RUBRIC_LEVELS.includes(level)) return sum;
+      return sum + rubricScoreValue[level];
+    }, 0);
+    return {
+      scoredCount,
+      totalCategories: sessionRubricCategories.length,
+      totalPoints,
+    };
+  };
+
   const exportCsv = async () => {
     if (sessionIsActive) return;
 
     const { data, error } = await supabase
       .from('documents')
-      .select('content_text,paste_count,stagnant_count,tabbed_out_count')
+      .select('student_name,content_text,paste_count,stagnant_count,tabbed_out_count,rubric_scores')
       .eq('session_id', sessionId);
 
     if (error) {
@@ -481,21 +566,58 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
       return;
     }
 
-    const rows = (data ?? []).map((doc, idx) => {
+    const rubricScoreValue: Record<RubricLevel, number> = {
+      Outstanding: 5,
+      Good: 4,
+      Competent: 3,
+      Approaching: 2,
+      'Needs Revision': 1,
+    };
+
+    const rows = (data ?? []).map((doc) => {
       const pastes = typeof doc.paste_count === 'number' ? doc.paste_count : 0;
       const stagnant = typeof doc.stagnant_count === 'number' ? doc.stagnant_count : 0;
       const tabbedOut = typeof doc.tabbed_out_count === 'number' ? doc.tabbed_out_count : 0;
       const studentWork = typeof doc.content_text === 'string' ? doc.content_text : '';
+      const studentName = typeof doc.student_name === 'string' ? doc.student_name : 'Unknown student';
+      const rubricScores =
+        doc.rubric_scores && typeof doc.rubric_scores === 'object' && !Array.isArray(doc.rubric_scores)
+          ? (doc.rubric_scores as Record<string, unknown>)
+          : {};
+
+      const rubricColumns = sessionRubricCategories.reduce<Record<string, string | number>>((acc, category) => {
+        const selected = rubricScores[category];
+        acc[`Rubric: ${category}`] =
+          typeof selected === 'string' && RUBRIC_LEVELS.includes(selected as RubricLevel) ? selected : '';
+        return acc;
+      }, {});
+
+      const rubricTotal = sessionRubricCategories.reduce((sum, category) => {
+        const selected = rubricScores[category];
+        if (typeof selected !== 'string' || !RUBRIC_LEVELS.includes(selected as RubricLevel)) return sum;
+        return sum + rubricScoreValue[selected as RubricLevel];
+      }, 0);
+
       return {
-        Student: `Student ${idx + 1}`,
+        Student: studentName,
         Pastes: pastes,
         'Times stagnant': stagnant,
         'Tabbed out': tabbedOut,
+        ...rubricColumns,
+        ...(sessionRubricCategories.length > 0 ? { 'Rubric total': rubricTotal } : {}),
         'Student work': studentWork,
       };
     });
 
-    const headers = ['Student', 'Pastes', 'Times stagnant', 'Tabbed out', 'Student work'];
+    const headers = [
+      'Student',
+      'Pastes',
+      'Times stagnant',
+      'Tabbed out',
+      ...sessionRubricCategories.map((category) => `Rubric: ${category}`),
+      ...(sessionRubricCategories.length > 0 ? ['Rubric total'] : []),
+      'Student work',
+    ];
     const escapeCsvValue = (v: unknown) => {
       const s = String(v ?? '');
       if (/[,"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -636,7 +758,9 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
   }, [sessionIsActive, sessionEndedAt]);
 
   const endClass = async () => {
-    const confirmed = window.confirm('This will end the class. Session data will be deleted from the database 10 minutes after end.');
+    const confirmed = window.confirm(
+      'This will end the class. Student documents and session data will be removed from the database about 10 minutes after end. Teacher feedback you submit is kept.'
+    );
     if (!confirmed) return;
 
     const nowIso = new Date().toISOString();
@@ -692,10 +816,11 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
               </div>
               {!sessionIsActive && sessionEndedAt && cleanupCountdownMs !== null ? (
                 <div className="mt-2 text-xs text-slate-500">
-                  Session data will be deleted in{' '}
+                  Session and student data will be removed in{' '}
                   <span className="font-mono font-semibold">
                     {Math.floor(cleanupCountdownMs / 60000)}m:{String(Math.floor((cleanupCountdownMs % 60000) / 1000)).padStart(2, '0')}s
                   </span>
+                  . Teacher feedback is kept.
                 </div>
               ) : null}
 
@@ -789,6 +914,29 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                   </button>
                 </div>
               </div>
+
+              <div className="mt-4 text-left">
+                <div className="mb-2 text-xs font-medium text-slate-600">
+                  Assignment rubric categories (one per line)
+                </div>
+                <textarea
+                  value={sessionRubricText}
+                  onChange={(e) => setSessionRubricText(e.target.value)}
+                  className="textarea-base h-24"
+                  placeholder="e.g., Thesis clarity&#10;Evidence quality&#10;Organization"
+                  disabled={isSettingRubric}
+                />
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="text-xs text-slate-500">
+                    {sessionRubricCategories.length > 0
+                      ? `${sessionRubricCategories.length} rubric categories saved`
+                      : 'Optional: leave blank if you do not want rubric scoring'}
+                  </div>
+                  <button type="button" onClick={handleSetRubric} disabled={isSettingRubric} className="btn-primary">
+                    {isSettingRubric ? 'Saving...' : 'Set rubric'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -796,6 +944,7 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from(students.values()).map((student) => {
             const isPulsing = student.isTabActive && student.isWindowFocused && (Date.now() - student.lastInput < 60000);
+            const rubricSummary = getRubricSummary(student);
 
             return (
               <div
@@ -853,6 +1002,16 @@ export function MonitorGrid({ sessionId, sessionCode }: MonitorGridProps) {
                       Open doc
                     </button>
                   </div>
+                  {rubricSummary ? (
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-2.5 py-1.5 text-xs">
+                      <span className="font-medium text-stone-700">
+                        Rubric scored: {rubricSummary.scoredCount}/{rubricSummary.totalCategories}
+                      </span>
+                      <span className="font-mono font-semibold text-stone-800">
+                        Points: {rubricSummary.totalPoints}
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                     <Activity className="w-3 h-3" />
                     <span>

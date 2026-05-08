@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { FileText, Bold, Italic, Underline, Highlighter, Copy, MessageSquare } from 'lucide-react';
+import { FileText, Bold, Italic, Underline, Highlighter, Download, MessageSquare } from 'lucide-react';
+import { Document, Packer, Paragraph } from 'docx';
 import { supabase } from '../lib/supabase';
 import { usePeerConnection, StudentHeartbeat } from '../hooks/usePeerConnection';
 
@@ -53,7 +54,7 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
   const templateAppliedRef = useRef(false);
   const contentTextRef = useRef(contentText);
   const [fontValue, setFontValue] = useState(FONT_OPTIONS[0].value);
-  const [copyStatus, setCopyStatus] = useState<string>('');
+  const [exportStatus, setExportStatus] = useState<string>('');
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [formatActive, setFormatActive] = useState({
     bold: false,
@@ -449,37 +450,36 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
     incrementPasteCount();
   };
 
-  const copyText = async () => {
+  const exportDocx = async () => {
     const text = (contentText || '').trim();
     if (!text) {
-      setCopyStatus('Nothing to copy');
-      window.setTimeout(() => setCopyStatus(''), 1500);
+      setExportStatus('Nothing to export');
+      window.setTimeout(() => setExportStatus(''), 1800);
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(text);
-      setCopyStatus('Copied');
-    } catch {
-      // Fallback for browsers/environments without clipboard permissions.
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      ta.style.top = '-9999px';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try {
-        document.execCommand('copy');
-        setCopyStatus('Copied');
-      } catch {
-        alert('Copy failed. Please try again.');
-      } finally {
-        ta.remove();
-      }
+      const paragraphs = text.split('\n').map((line) => new Paragraph(line || ''));
+      const doc = new Document({
+        sections: [{ children: paragraphs }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const slug = studentName.trim().replace(/\s+/g, '-').toLowerCase() || 'student-work';
+      a.href = url;
+      a.download = `lockd-${slug}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportStatus('DOCX downloaded');
+    } catch (err) {
+      console.error('DOCX export failed:', err);
+      alert('Failed to export DOCX. Please try again.');
     } finally {
-      window.setTimeout(() => setCopyStatus(''), 1500);
+      window.setTimeout(() => setExportStatus(''), 1800);
     }
   };
 
@@ -630,15 +630,15 @@ export function Editor({ sessionId, studentId, studentName, teacherPeerId, docum
                 <div className="ml-auto flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={copyText}
+                    onClick={exportDocx}
                     disabled={!contentText.trim()}
                     className="btn-primary px-3 py-1.5"
                   >
-                    <Copy className="w-4 h-4" />
-                    Copy text
+                    <Download className="w-4 h-4" />
+                    Export DOCX
                   </button>
-                  {copyStatus ? (
-                    <span className="text-xs font-medium text-stone-700">{copyStatus}</span>
+                  {exportStatus ? (
+                    <span className="text-xs font-medium text-stone-700">{exportStatus}</span>
                   ) : null}
                 </div>
               </div>

@@ -8,11 +8,13 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "db:push": "supabase db push"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.82",
     "@supabase/supabase-js": "^2.57.4",
+    "docx": "^9.6.1",
     "lucide-react": "^0.344.0",
     "mammoth": "^1.6.0",
     "peerjs": "^1.5.5",
