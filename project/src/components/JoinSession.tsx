@@ -48,19 +48,23 @@ export function JoinSession() {
       if (error) throw error;
     }
 
-    // Ensure we have role + name metadata so routing works and the editor header is correct.
+    // Role + name for routing / editor header. Do not downgrade teachers who join a class as a participant.
+    const { data: beforeUser, error: beforeErr } = await supabase.auth.getUser();
+    if (beforeErr) throw beforeErr;
+    const beforeMeta = (beforeUser.user?.user_metadata ?? {}) as StudentMeta;
+    const preserveTeacher = beforeMeta.role === 'teacher';
     const desired = desiredFullName.trim();
     if (desired) {
       await supabase.auth.updateUser({
         data: {
-          role: 'student',
+          role: preserveTeacher ? 'teacher' : 'student',
           full_name: desired,
         },
       });
     } else {
       await supabase.auth.updateUser({
         data: {
-          role: 'student',
+          role: preserveTeacher ? 'teacher' : 'student',
         },
       });
     }
