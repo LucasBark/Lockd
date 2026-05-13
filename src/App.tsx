@@ -62,6 +62,34 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Must be nested inside RequireAuth. */
+function RequireTeacher({ children }: { children: React.ReactNode }) {
+  const { isAuthed, isLoading, userId } = useAuth();
+  const [role, setRole] = useState<'teacher' | 'student' | 'unknown' | null>(null);
+
+  useEffect(() => {
+    if (isLoading || !isAuthed || !userId) {
+      setRole(null);
+      return;
+    }
+    let mounted = true;
+    setRole(null);
+    getUserRole().then((r) => {
+      if (mounted) setRole(r);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthed, isLoading, userId]);
+
+  if (isLoading || !isAuthed) return null;
+  if (role === null) return null;
+  if (role !== 'teacher') {
+    return <Navigate to={role === 'student' ? '/student/join' : '/auth'} replace />;
+  }
+  return <>{children}</>;
+}
+
 async function getUserRole(): Promise<'teacher' | 'student' | 'unknown'> {
   const { data, error } = await supabase.auth.getUser();
   if (error) return 'unknown';
@@ -100,8 +128,34 @@ function TeacherSessionRoute() {
   const { sessionId } = useParams();
   const [searchParams] = useSearchParams();
   const sessionCode = searchParams.get('code') ?? '';
+  const { userId } = useAuth();
+  const [access, setAccess] = useState<'loading' | 'ok' | 'denied'>('loading');
+
+  useEffect(() => {
+    if (!sessionId || !userId) return;
+    setAccess('loading');
+    let mounted = true;
+    supabase
+      .from('sessions')
+      .select('teacher_id')
+      .eq('id', sessionId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error || !data?.teacher_id) {
+          setAccess('denied');
+          return;
+        }
+        setAccess(data.teacher_id === userId ? 'ok' : 'denied');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId, userId]);
 
   if (!sessionId) return <Navigate to="/" replace />;
+  if (access === 'loading') return null;
+  if (access === 'denied') return <Navigate to="/teacher/create" replace />;
   return <MonitorGrid sessionId={sessionId} sessionCode={sessionCode} />;
 }
 
@@ -111,6 +165,33 @@ function StudentEditorRoute() {
 
   const [studentName, setStudentName] = useState<string>('');
   const [teacherPeerId, setTeacherPeerId] = useState<string>('');
+  const [docAccess, setDocAccess] = useState<'loading' | 'ok' | 'denied'>('loading');
+
+  useEffect(() => {
+    if (!sessionId || !documentId || !userId) return;
+    setDocAccess('loading');
+    let mounted = true;
+    supabase
+      .from('documents')
+      .select('session_id,student_id')
+      .eq('id', documentId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error || !data) {
+          setDocAccess('denied');
+          return;
+        }
+        if (data.session_id !== sessionId || data.student_id !== userId) {
+          setDocAccess('denied');
+          return;
+        }
+        setDocAccess('ok');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId, documentId, userId]);
 
   useEffect(() => {
     let mounted = true;
@@ -157,6 +238,8 @@ function StudentEditorRoute() {
   }, [sessionId]);
 
   if (!sessionId || !documentId) return <Navigate to="/" replace />;
+  if (docAccess === 'loading') return null;
+  if (docAccess === 'denied') return <Navigate to="/student/join" replace />;
   return (
     <Editor
       sessionId={sessionId}
@@ -197,7 +280,9 @@ function App() {
           path="/teacher/create"
           element={
             <RequireAuth>
-              <CreateSession userId={auth.userId} />
+              <RequireTeacher>
+                <CreateSession userId={auth.userId} />
+              </RequireTeacher>
             </RequireAuth>
           }
         />
@@ -205,7 +290,9 @@ function App() {
           path="/teacher/session/:sessionId"
           element={
             <RequireAuth>
-              <TeacherSessionRoute />
+              <RequireTeacher>
+                <TeacherSessionRoute />
+              </RequireTeacher>
             </RequireAuth>
           }
         />

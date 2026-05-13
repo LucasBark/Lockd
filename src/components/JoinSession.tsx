@@ -97,12 +97,16 @@ export function JoinSession() {
         return;
       }
 
-      const { data: existingDoc } = await supabase
+      const { data: existingDoc, error: existingErr } = await supabase
         .from('documents')
         .select('*')
         .eq('session_id', sessionData.id)
         .eq('student_id', userId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
+
+      if (existingErr) throw existingErr;
 
       if (existingDoc) {
         navigate(
@@ -129,7 +133,25 @@ export function JoinSession() {
         .select()
         .single();
 
-      if (documentError) throw documentError;
+      if (documentError) {
+        // Concurrent joins can race; unique(session_id, student_id) leaves one row.
+        if (documentError.code === '23505') {
+          const { data: racedDoc, error: racedErr } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('session_id', sessionData.id)
+            .eq('student_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (racedErr) throw racedErr;
+          if (racedDoc?.id) {
+            navigate(`/student/session/${sessionData.id}/doc/${racedDoc.id}`, { replace: true });
+            return;
+          }
+        }
+        throw documentError;
+      }
 
       if (documentData) {
         navigate(
